@@ -19,12 +19,41 @@ import dolfin as dl
 import ufl
 import numpy as np
 
+from ..algorithms.linSolvers import PETScKrylovSolver
+
 class TVPrior:
-    def __init__(self, Vh:dl.FunctionSpace, alpha:float, beta:float, LD:bool=False):
+    # primal-dual implementation for (vector) total variation prior
+    def __init__(self, Vhm:dl.FunctionSpace, Vhw:dl.FunctionSpace, alpha:float, beta:float, rel_tol:float=1e-12, max_iter:int=100):
         self.alpha = dl.Constant(alpha)
         self.beta = dl.Constant(beta)
-        self.Vh = Vh
-        self.LD = LD
+        self.Vhm = Vhm
+        self.Vhw = Vhw
+
+        # assemble mass matrix for parameter
+        mtrial = dl.TrialFunction(Vhm)
+        mtest  = dl.TestFunction(Vhm)
+        
+        varfM = ufl.inner(mtrial, mtest)*ufl.dx
+        self.M = dl.assemble(varfM)
+        self.Msolver = PETScKrylovSolver(self.Vh.mesh().mpi_comm(), "cg", "jacobi")
+        self.Msolver.set_operator(self.M)
+        self.Msolver.parameters["maximum_iterations"] = max_iter
+        self.Msolver.parameters["relative_tolerance"] = rel_tol
+        self.Msolver.parameters["error_on_nonconvergence"] = True
+        self.Msolver.parameters["nonzero_initial_guess"] = False
+        
+        # assemble mass matrix for slack variable
+        wtrial = dl.TrialFunction(Vhm)
+        wtest  = dl.TestFunction(Vhm)
+        
+        varfMw = ufl.inner(wtrial, wtest)*ufl.dx
+        self.Mw = dl.assemble(varfMw)
+        self.Mwsolver = PETScKrylovSolver(self.Vhw.mesh().mpi_comm(), "cg", "jacobi")
+        self.Mwsolver.set_operator(self.M)
+        self.Mwsolver.parameters["maximum_iterations"] = max_iter
+        self.Mwsolver.parameters["relative_tolerance"] = rel_tol
+        self.Mwsolver.parameters["error_on_nonconvergence"] = True
+        self.Mwsolver.parameters["nonzero_initial_guess"] = False
 
     def _fTV(self, m:dl.Function)->dl.Function:
         """Helper function to compute the TV norm of a function m.
@@ -47,4 +76,5 @@ class TVPrior:
     
     
 class TVGaussianPrior:
+    # primal implementation
     raise NotImplementedError("Fused TV+Gaussian Prior not yet implemented.")

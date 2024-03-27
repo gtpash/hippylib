@@ -68,7 +68,8 @@ class TVPrior:
     
     
     def cost(self, m):
-        raise NotImplementedError("Cost not implemented.")
+        # (smoothed) TV functional
+        return dl.sqrt( dl.inner(dl.grad(m), dl.grad(m)) + self.beta)*dl.dx
     
     
     def grad(self, m, out):

@@ -111,7 +111,7 @@ class TVPrior:
         return self.alpha * dl.inner(A*dl.grad(m_dir), dl.grad(self.m_test))*dl.dx
     
     
-    def applyRNS(self, dm, out):
+    def applyR(self, dm, out):
         out.zero()  # zero out the output
         
         m_dir = vector2Function(dm, self.Vhm)
@@ -155,4 +155,4 @@ class TVPrior:
     
 class TVGaussianPrior:
     # primal implementation
-    raise NotImplementedError("Fused TV+Gaussian Prior not yet implemented.")
+    raise NotImplementedError("Fused TV+Gaussian Prior primal formulation not yet implemented.")

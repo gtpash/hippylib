@@ -38,6 +38,8 @@ class TVPrior:
         # linearization point
         self.m_lin = None
         self.w_lin = None
+        
+        self.gauss_newton_approx = False  # by default don't use GN approximation to Hessian
 
         # assemble mass matrix for parameter, slack variable, norm of slack variable
         self.m_trial, self.m_test, self.M, self.Msolver = self._setupM(self.Vhm)
@@ -78,9 +80,10 @@ class TVPrior:
         return dl.sqrt( dl.inner(dl.grad(m), dl.grad(m)) + self.beta)
     
     
-    def setLinearizationPoint(self, m, w):
+    def setLinearizationPoint(self, m:dl.Vector, w:dl.Vector, gauss_newton_approx:bool):
         self.m_lin = vector2Function(m, self.Vhm)
         self.w_lin = vector2Function(w, self.Vhw)
+        self.gauss_newton_approx = gauss_newton_approx
     
     
     def cost(self, m):

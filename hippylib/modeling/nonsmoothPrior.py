@@ -20,6 +20,7 @@ import ufl
 import numpy as np
 
 from ..algorithms.linSolvers import PETScKrylovSolver
+from ..utils.vector2function import vector2Function
 
 class TVPrior:
     
@@ -34,10 +35,14 @@ class TVPrior:
         self.Vhw = Vhw  # function space for the slack variable
         self.Vhwnorm = Vhwnorm  # function space for the norm of the slack variable
 
+        # linearization point
+        self.m_lin = None
+        self.w_lin = None
+
         # assemble mass matrix for parameter, slack variable, norm of slack variable
-        self.m_hat, self.m_tilde, self.M, self.Msolver = self._setupM(self.Vhm)
-        self.w_hat, self.w_tilde, self.Mw, self.Mwsolver = self._setupM(self.Vhw)        
-        self.wnorm_hat, self.wnorm_tilde, self.Mwnorm, self.Mwnormsolver = self._setupM(self.Vhwnorm)
+        self.m_trial, self.m_test, self.M, self.Msolver = self._setupM(self.Vhm)
+        self.w_trial, self.w_test, self.Mw, self.Mwsolver = self._setupM(self.Vhw)        
+        self.wnorm_trial, self.wnorm_test, self.Mwnorm, self.Mwnormsolver = self._setupM(self.Vhwnorm)
 
 
     def _setupM(self, Vh:dl.FunctionSpace):
@@ -73,6 +78,11 @@ class TVPrior:
         return dl.sqrt( dl.inner(dl.grad(m), dl.grad(m)) + self.beta)
     
     
+    def setLinearizationPoint(self, m, w):
+        self.m_lin = vector2Function(m, self.Vhm)
+        self.w_lin = vector2Function(w, self.Vhw)
+    
+    
     def cost(self, m):
         # (smoothed) TV functional
         return self.alpha * dl.sqrt( dl.inner(dl.grad(m), dl.grad(m)) + self.beta)*dl.dx
@@ -80,14 +90,14 @@ class TVPrior:
     
     def grad(self, m, out):
         TVm = self._fTV(m)
-        grad_tv = self.alpha * dl.Constant(1.)/TVm*dl.inner(dl.grad(m), dl.grad(self.m_tilde))*dl.dx
+        grad_tv = self.alpha * dl.Constant(1.)/TVm*dl.inner(dl.grad(m), dl.grad(self.m_test))*dl.dx
         
         # assemble the UFL form to a vector, add to out
         v = dl.assemble(grad_tv)
         out.axpy(1., v)
     
     
-    def hess(self, m, w):
+    def hess(self, m, w, m_dir):
         TVm = self._fTV(m)
         
         # symmetrized version of (5.2) from [1]
@@ -95,12 +105,16 @@ class TVPrior:
                                     - dl.Constant(0.5)*dl.outer(w, dl.grad(m)/TVm)
                                     - dl.Constant(0.5)*dl.outer(dl.grad(m)/TVm, w) )
         
-        return self.alpha * dl.inner(A*dl.grad(self.m_tilde), dl.grad(self.m_hat))*dl.dx
+        return self.alpha * dl.inner(A*dl.grad(m_dir), dl.grad(self.m_test))*dl.dx
     
     
     def applyRNS(self, dm, out):
-        #todo helper function to apply hessian ? 
-        raise NotImplementedError("Not yet implemented.")
+        out.zero()  # zero out the output
+        
+        m_dir = vector2Function(dm, self.Vhm)
+        hessian_action_form = self.hess(self.m_lin, self.w_lin, m_dir)
+        
+        dl.assemble(hessian_action_form, tensor=out)
     
     
     def compute_w_hat(self, m, w, m_hat):
@@ -113,7 +127,7 @@ class TVPrior:
         
         # expression for incremental slack variable (3.6) from [1]
         dw = A*dl.grad(m_hat) - w + dl.grad(m)/TVm
-        dw = dl.assemble( dl.inner(self.w_tilde, dw)*dl.dx )
+        dw = dl.assemble( dl.inner(self.w_test, dw)*dl.dx )
         
         # project into appropriate space
         out = dl.Vector(self.Mw.mpi_comm())
@@ -126,7 +140,7 @@ class TVPrior:
     def wnorm(self, w):
         # compute functional and assemble
         nw = dl.inner(w, w)
-        nw = dl.assemble( dl.inner(self.wnorm_tilde, nw)*dl.dx )
+        nw = dl.assemble( dl.inner(self.wnorm_test, nw)*dl.dx )
         
         # project into appropriate space
         out = dl.Vector(self.Mwnorm.mpi_comm())

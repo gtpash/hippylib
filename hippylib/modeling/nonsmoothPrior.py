@@ -17,13 +17,15 @@
 
 import dolfin as dl
 import ufl
-import numpy as np
 
 from ..algorithms.linSolvers import PETScKrylovSolver
 from ..utils.vector2function import vector2Function
 
 class TVPrior:
+    """
+    This class implements the primal-dual formulation for the total variation prior.
     
+    """
     # [1] Chan, Tony F., Gene H. Golub, and Pep Mulet. "A nonlinear primal-dual method for total variation-based image restoration." SIAM journal on scientific computing 20.6 (1999): 1964-1977.
     
     # primal-dual implementation for (vector) total variation prior
@@ -42,6 +44,8 @@ class TVPrior:
         self.gauss_newton_approx = False  # by default don't use GN approximation to Hessian
 
         # assemble mass matrix for parameter, slack variable, norm of slack variable
+        self.rel_tol = rel_tol
+        self.max_iter = max_iter
         self.m_trial, self.m_test, self.M, self.Msolver = self._setupM(self.Vhm)
         self.w_trial, self.w_test, self.Mw, self.Mwsolver = self._setupM(self.Vhw)        
         self.wnorm_trial, self.wnorm_test, self.Mwnorm, self.Mwnormsolver = self._setupM(self.Vhwnorm)
@@ -88,7 +92,7 @@ class TVPrior:
     
     def cost(self, m):
         # (smoothed) TV functional
-        return self.alpha * dl.sqrt( dl.inner(dl.grad(m), dl.grad(m)) + self.beta)*dl.dx
+        return dl.assemble( self.alpha * self._fTV(m)*dl.dx )
     
     
     def grad(self, m, out):
@@ -153,6 +157,11 @@ class TVPrior:
         return out
     
     
-class TVGaussianPrior:
-    # primal implementation
-    raise NotImplementedError("Fused TV+Gaussian Prior primal formulation not yet implemented.")
+    def generate_slack(self):
+        """ Return a vector in the shape of the slack variable. """
+        return dl.Function(self.Vhw).vector()
+    
+    
+# class TVGaussianPrior:
+#     # primal implementation
+#     raise NotImplementedError("Fused TV+Gaussian Prior primal formulation not yet implemented.")

@@ -16,9 +16,9 @@
 # Software Foundation) version 2.0 dated June 1991.
 
 from typing import List
-import dolfin as dl
 import math
 from .variables import STATE, PARAMETER, ADJOINT, SLACK
+from ..utils.vector2function import vector2Function
 
 class ModelNS:
     """
@@ -78,7 +78,7 @@ class ModelNS:
             x = [self.problem.generate_state(),
                  self.problem.generate_parameter(),
                  self.problem.generate_state(),
-                 self.problem.generate_parameter()]
+                 self.nsprior.generate_slack()]
         elif component == STATE:
             x = self.problem.generate_state()
         elif component == PARAMETER:
@@ -86,7 +86,7 @@ class ModelNS:
         elif component == ADJOINT:
             x = self.problem.generate_state()
         elif component == SLACK:
-            x = self.problem.generate_parameter()
+            x = self.nsprior.generate_slack()
             
         return x
 
@@ -123,7 +123,7 @@ class ModelNS:
         
         # if there is a nonsmooth portion, compute it
         if self.nsprior is not None and self.which[2]:
-            nonsmooth_reg_cost = self.nsprior.cost(x[PARAMETER])
+            nonsmooth_reg_cost = self.nsprior.cost(vector2Function(x[PARAMETER], self.nsprior.Vhm))
         else:
             nonsmooth_reg_cost = 0.
             

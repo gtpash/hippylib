@@ -32,33 +32,34 @@ class TVPrior:
         
         self.Vhm = Vhm  # function space for the parameter
         self.Vhw = Vhw  # function space for the slack variable
-        self.Vwnorm = Vhwnorm  # function space for the norm of the slack variable
+        self.Vhwnorm = Vhwnorm  # function space for the norm of the slack variable
 
-        # assemble mass matrix for parameter
-        self.m_hat = dl.TrialFunction(Vhm)
-        self.m_tilde  = dl.TestFunction(Vhm)
+        # assemble mass matrix for parameter, slack variable, norm of slack variable
+        self.m_hat, self.m_tilde, self.M, self.Msolver = self._setupM(self.Vhm)
+        self.w_hat, self.w_tilde, self.Mw, self.Mwsolver = self._setupM(self.Vhw)        
+        self.wnorm_hat, self.wnorm_tilde, self.Mwnorm, self.Mwnormsolver = self._setupM(self.Vhwnorm)
+
+
+    def _setupM(self, Vh:dl.FunctionSpace):
+        # helper function to set up mass matrix, solver
+        trial = dl.TrialFunction(Vh)
+        test = dl.TestFunction(Vh)
         
-        varfM = ufl.inner(self.m_hat, self.m_tilde)*ufl.dx
-        self.M = dl.assemble(varfM)
-        self.Msolver = PETScKrylovSolver(self.Vh.mesh().mpi_comm(), "cg", "jacobi")
-        self.Msolver.set_operator(self.M)
-        self.Msolver.parameters["maximum_iterations"] = max_iter
-        self.Msolver.parameters["relative_tolerance"] = rel_tol
-        self.Msolver.parameters["error_on_nonconvergence"] = True
-        self.Msolver.parameters["nonzero_initial_guess"] = False
+        # assemble mass matrix from variational form
+        varfM = dl.inner(trial, test)*dl.dx
+        M = dl.assemble(varfM)
         
-        # assemble mass matrix for slack variable
-        self.w_hat = dl.TrialFunction(Vhw)
-        self.w_tilde  = dl.TestFunction(Vhw)
+        # set up PETSc solver object to apply M^{-1}
+        Msolver = PETScKrylovSolver(Vh.mesh().mpi_comm(), "cg", "jacobi")
+        Msolver.set_operator(M)
+        Msolver.parameters["maximum_iterations"] = self.max_iter
+        Msolver.parameters["relative_tolerance"] = self.rel_tol
+        Msolver.parameters["error_on_nonconvergence"] = True
+        Msolver.parameters["nonzero_initial_guess"] = False
         
-        varfMw = dl.inner(self.w_hat, self.w_tilde)*dl.dx
-        self.Mw = dl.assemble(varfMw)
-        self.Mwsolver = PETScKrylovSolver(self.Vhw.mesh().mpi_comm(), "cg", "jacobi")
-        self.Mwsolver.set_operator(self.Mw)
-        self.Mwsolver.parameters["maximum_iterations"] = max_iter
-        self.Mwsolver.parameters["relative_tolerance"] = rel_tol
-        self.Mwsolver.parameters["error_on_nonconvergence"] = True
-        self.Mwsolver.parameters["nonzero_initial_guess"] = False
+        # return objects
+        return trial, test, M, Msolver
+
 
     def _fTV(self, m:dl.Function)->dl.Function:
         """Computes the TV functional.
@@ -97,6 +98,11 @@ class TVPrior:
         return self.alpha * dl.inner(A*dl.grad(self.m_tilde), dl.grad(self.m_hat))*dl.dx
     
     
+    def applyRNS(self, dm, out):
+        #todo helper function to apply hessian ? 
+        raise NotImplementedError("Not yet implemented.")
+    
+    
     def compute_w_hat(self, m, w, m_hat):
         TVm = self._fTV(m)
         
@@ -111,14 +117,23 @@ class TVPrior:
         
         # project into appropriate space
         out = dl.Vector(self.Mw.mpi_comm())
-        self.Mw.init_vector(out, dw)
+        self.Mw.init_vector(out, 0)
+        self.Mwsolver.solve(out, dw)
         
         return out
     
     
     def wnorm(self, w):
-        # todo: assembly, projection
-        return dl.inner(w, w)
+        # compute functional and assemble
+        nw = dl.inner(w, w)
+        nw = dl.assemble( dl.inner(self.wnorm_tilde, nw)*dl.dx )
+        
+        # project into appropriate space
+        out = dl.Vector(self.Mwnorm.mpi_comm())
+        self.Mwnorm.init_vector(out, 0)
+        self.Mwnormsolver.solve(out, nw)
+        
+        return out
     
     
 class TVGaussianPrior:

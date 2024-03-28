@@ -175,7 +175,6 @@ class ModelNS:
     
     
     def evalGradientParameter(self,x, mg, which=[True, True, True]):
-        # TODO: which, list that picks out [misfit, smooth, nonsmooth]
         """
         Evaluate the gradient for the variational parameter equation at the point :code:`x=[u,m,p]`.
 
@@ -211,7 +210,7 @@ class ModelNS:
     
     def setPointForHessianEvaluations(self, x, gauss_newton_approx=False):
         """
-        Specify the point :code:`x = [u,m,p]` at which the Hessian operator (or the Gauss-Newton approximation)
+        Specify the point :code:`x = [u,m,p,w]` at which the Hessian operator (or the Gauss-Newton approximation)
         needs to be evaluated.
 
         Parameters:

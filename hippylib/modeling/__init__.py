@@ -27,5 +27,7 @@ from .misfit import Misfit, ContinuousStateObservation, DiscreteStateObservation
 from .model import Model
 from .modelVerify import modelVerify
 from .reducedHessian import ReducedHessian, FDHessian
+from .nonsmoothPrior import TVPrior
+from .nonsmoothModel import ModelNS
 
 from .posterior import GaussianLRPosterior, LowRankHessian

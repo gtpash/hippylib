@@ -96,12 +96,16 @@ class TVPrior:
     
     
     def grad(self, m, out):
+        out.zero()
+        #todo: check projection, vector vs function
+        m = vector2Function(m, self.Vhm)
+        
         TVm = self._fTV(m)
         grad_tv = self.alpha * dl.Constant(1.)/TVm*dl.inner(dl.grad(m), dl.grad(self.m_test))*dl.dx
         
         # assemble the UFL form to a vector, add to out
-        v = dl.assemble(grad_tv)
-        out.axpy(1., v)
+        dl.assemble(grad_tv, tensor=out)
+        # out.axpy(1., v)
     
     
     def hess(self, m, w, m_dir):
@@ -160,6 +164,19 @@ class TVPrior:
     def generate_slack(self):
         """ Return a vector in the shape of the slack variable. """
         return dl.Function(self.Vhw).vector()
+    
+    
+    def compute_w(self, m:dl.Vector):
+        m = vector2Function(m, self.Vhm)
+        
+        TVm = self._fTV(m)
+        w = dl.grad(m)/TVm
+        w = dl.assemble( dl.inner(self.w_test, w)*dl.dx )
+        
+        out = dl.Vector(self.Mw.mpi_comm())
+        self.Mw.init_vector(out, 0)
+        self.Mwsolver.solve(out, w)
+        return out
     
     
 # class TVGaussianPrior:

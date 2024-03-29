@@ -176,7 +176,7 @@ class ModelNS:
     
     def evalGradientParameter(self,x, mg, which=[True, True, True]):
         """
-        Evaluate the gradient for the variational parameter equation at the point :code:`x=[u,m,p]`.
+        Evaluate the gradient for the variational parameter equation at the point :code:`x=[u,m,p,w]`.
 
         Parameters:
 
@@ -367,6 +367,23 @@ class ModelNS:
         self.prior.R.mult(dm, out)
     
     
+    def Hprec(self):
+        """
+        Return an object :code:`PSolver` that is a suitable preconditioner for the Hessian operator.
+        
+        The solver object should implment the method :code:`PSolver.solve(z,r)` such that
+        :math:`Pz \approx r`.
+        """
+        if self.prior is not None and self.which[1]:
+            # return the precision matrix if using a smooth prior
+            return self.prior.Rsolver
+        elif self.nsprior is not None and self.which[2]:
+            # return solver object for the non-smooth portion + bit of mass matrix
+            return self.nsprior.Psolver
+        else:
+            raise ValueError("No preconditioner defined.")
+    
+    
     def Rsolver(self):
         """
         Return an object :code:`Rsolver` that is a suitable solver for the regularization
@@ -375,7 +392,10 @@ class ModelNS:
         The solver object should implement the method :code:`Rsolver.solve(z,r)` such that
         :math:`Rz \approx r`.
         """
-        return self.prior.Rsolver
+        if self.prior is not None and self.which[1]:
+            return self.prior.Rsolver
+        else:
+            return None
 
 
     def applyRNS(self, dm, out):

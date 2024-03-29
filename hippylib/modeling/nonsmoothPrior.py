@@ -29,7 +29,7 @@ class TVPrior:
     # [1] Chan, Tony F., Gene H. Golub, and Pep Mulet. "A nonlinear primal-dual method for total variation-based image restoration." SIAM journal on scientific computing 20.6 (1999): 1964-1977.
     
     # primal-dual implementation for (vector) total variation prior
-    def __init__(self, Vhm:dl.FunctionSpace, Vhw:dl.FunctionSpace, Vhwnorm:dl.FunctionSpace, alpha:float, beta:float, rel_tol:float=1e-12, max_iter:int=100):
+    def __init__(self, Vhm:dl.FunctionSpace, Vhw:dl.FunctionSpace, Vhwnorm:dl.FunctionSpace, alpha:float, beta:float, peps:float=1e-3, rel_tol:float=1e-12, max_iter:int=100):
         self.alpha = dl.Constant(alpha)
         self.beta = dl.Constant(beta)
         
@@ -42,6 +42,8 @@ class TVPrior:
         self.w_lin = None
         
         self.gauss_newton_approx = False  # by default don't use GN approximation to Hessian
+        
+        self.peps = peps  # mass matrix perturbation for preconditioner
 
         # assemble mass matrix for parameter, slack variable, norm of slack variable
         self.rel_tol = rel_tol
@@ -97,7 +99,6 @@ class TVPrior:
     
     def grad(self, m, out):
         out.zero()
-        #todo: check projection, vector vs function
         m = vector2Function(m, self.Vhm)
         
         TVm = self._fTV(m)
@@ -105,10 +106,9 @@ class TVPrior:
         
         # assemble the UFL form to a vector, add to out
         dl.assemble(grad_tv, tensor=out)
-        # out.axpy(1., v)
     
     
-    def hess(self, m, w, m_dir):
+    def hess_action(self, m, w, m_dir):
         TVm = self._fTV(m)
         
         # symmetrized version of (5.2) from [1]
@@ -123,7 +123,7 @@ class TVPrior:
         out.zero()  # zero out the output
         
         m_dir = vector2Function(dm, self.Vhm)
-        hessian_action_form = self.hess(self.m_lin, self.w_lin, m_dir)
+        hessian_action_form = self.hess_action(self.m_lin, self.w_lin, m_dir)
         
         dl.assemble(hessian_action_form, tensor=out)
     
@@ -178,6 +178,21 @@ class TVPrior:
         self.Mwsolver.solve(out, w)
         return out
     
+    
+    def Psolver(self):
+        # set up the preconditioner
+        varfHTV = self.hess(self.m_lin, self.w_lin)
+        varfM = dl.inner(self.m_trial, self.m_test)*dl.dx
+        varfP = varfHTV + self.peps*varfM
+        
+        # assemble the preconditioner and set as operator for solver
+        P = dl.assemble(varfP)
+        Psolver = PETScKrylovSolver(self.Vh.mesh().mpi_comm(), "cg", "jacobi")
+        Psolver.set_operator(P)
+        Psolver.parameters["nonzero_initial_guess"] = False
+        
+        return Psolver
+        
     
 # class TVGaussianPrior:
 #     # primal implementation

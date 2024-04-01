@@ -192,6 +192,10 @@ class TVPrior:
         Psolver.parameters["nonzero_initial_guess"] = False
         
         return Psolver
+    
+    
+    def mpi_comm(self):
+        return self.Vh.mesh().mpi_comm()
         
     
 # class TVGaussianPrior:

@@ -17,7 +17,7 @@
 
 import math
 from ..utils.parameterList import ParameterList
-from ..modeling.reducedHessian import ReducedHessian
+from ..modeling.reducedHessian import NSReducedHessian
 from ..modeling.variables import STATE, PARAMETER, ADJOINT, SLACK
 from .cgsolverSteihaug import CGSolverSteihaug
 
@@ -92,7 +92,7 @@ class ReducedSpacePDNewtonCG:
        - :code:`applyR(dm, out)`    --> Compute out = :math:`R  dm`
        - :code:`applyRNS(dm, out)`  --> Compute out = :math:`R_{NS} dm`
        - :code:`applyWmm(dm,out)`   --> Compute out = :math:`W_{mm} dm`
-       - :code:`Rsolver()`          --> A solver for the smooth regularization term
+       - :code:`Psolver()`          --> A solver for the Hessian preconditioner
        
     Type :code:`help(Model)` for additional information
     """
@@ -144,6 +144,10 @@ class ReducedSpacePDNewtonCG:
         if x[ADJOINT] is None:
             x[ADJOINT] = self.model.generate_vector(ADJOINT)
             
+        if x[SLACK] is None:
+            # alternatively, one could think about computing the slack variable from nonzero initial parameter
+            x[SLACK] = self.model.generate_vector(SLACK)
+            
         if self.parameters["globalization"] == "LS":
             return self._solve_dls(x)
         else:
@@ -173,14 +177,13 @@ class ReducedSpacePDNewtonCG:
         mhat = self.model.generate_vector(PARAMETER)
         what = self.model.generate_vector(SLACK)
         mg = self.model.generate_vector(PARAMETER)
-                
+        
         x_star = [None, None, None, None]
         x_star[STATE]     = self.model.generate_vector(STATE)
         x_star[PARAMETER] = self.model.generate_vector(PARAMETER)
         x_star[SLACK]     = self.model.generate_vector(SLACK)
         
         cost_old, _, _, _ = self.model.cost(x)
-        breakpoint()
         
         while (self.it < max_iter) and (self.converged == False):
             self.model.solveAdj(x[ADJOINT], x)
@@ -202,10 +205,11 @@ class ReducedSpacePDNewtonCG:
             
             tolcg = min(cg_coarse_tolerance, math.sqrt(gradnorm/gradnorm_ini))
             
-            HessApply = ReducedHessian(self.model)
-            solver = CGSolverSteihaug(comm = self.model.prior.R.mpi_comm())
+            # compute m_hat using (3.5) from [1]
+            HessApply = NSReducedHessian(self.model)
+            solver = CGSolverSteihaug(comm = self.model.nsprior.mpi_comm())
             solver.set_operator(HessApply)
-            solver.set_preconditioner(self.model.Rsolver())
+            solver.set_preconditioner(self.model.Psolver())
             solver.parameters["rel_tolerance"] = tolcg
             solver.parameters["max_iter"] = cg_max_iter
             solver.parameters["zero_initial_guess"] = True
@@ -213,6 +217,11 @@ class ReducedSpacePDNewtonCG:
             
             solver.solve(mhat, -mg)
             self.total_cg_iter += HessApply.ncalls
+            
+            # compute w_hat using (3.6) from [1]
+            # In the first iteration, the slack variable is left as zero and not computed from the parameter
+            # this ensures stability if the initial parameter is constant (zero gradient) and has similar convergence
+            self.nsprior.comput_w_hat(x[PARAMETER], x[SLACK], mhat, what)
             
             alpha = 1.0
             descent = 0

@@ -133,7 +133,7 @@ class ReducedSpacePDNewtonCG:
         """
 
         Input: 
-            :code:`x = [u, m, p, w]` represents the initial guess (u and p may be None). 
+            :code:`x = [u, m, p, w]` represents the initial guess (u, p, and w may be None). 
             :code:`x` will be overwritten on return.
         """
         if self.model is None:
@@ -222,7 +222,7 @@ class ReducedSpacePDNewtonCG:
             # compute w_hat using (3.6) from [1]
             # In the first iteration, the slack variable is left as zero and not computed from the parameter
             # this ensures stability if the initial parameter is constant (zero gradient) and has similar convergence
-            self.nsprior.comput_w_hat(x[PARAMETER], x[SLACK], mhat, what)
+            self.model.nsprior.compute_w_hat(x[PARAMETER], x[SLACK], mhat, what)
             
             ### line search for m
             alpha_m = 1.0

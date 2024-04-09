@@ -367,7 +367,7 @@ class ModelNS:
         self.prior.R.mult(dm, out)
     
     
-    def Hprec(self):
+    def Psolver(self):
         """
         Return an object :code:`PSolver` that is a suitable preconditioner for the Hessian operator.
         

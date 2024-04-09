@@ -97,10 +97,11 @@ class ReducedSpacePDNewtonCG:
     Type :code:`help(Model)` for additional information
     """
     termination_reasons = [
-                           "Maximum number of Iterations reached",     #0
-                           "Norm of the gradient less than tolerance", #1
-                           "Maximum number of backtracking reached",   #2
-                           "Norm of (g, dm) less than tolerance"       #3
+                           "Maximum number of Iterations reached",                 #0
+                           "Norm of the gradient less than tolerance",             #1
+                           "Maximum number of (parameter) backtracking reached",   #2
+                           "Maximum number of (slack) backtracking reached",       #3
+                           "Norm of (g, dm) less than tolerance"                   #4
                            ]
     
     def __init__(self, model, parameters=ReducedSpacePDNewtonCG_ParameterList(), callback = None):
@@ -223,55 +224,87 @@ class ReducedSpacePDNewtonCG:
             # this ensures stability if the initial parameter is constant (zero gradient) and has similar convergence
             self.nsprior.comput_w_hat(x[PARAMETER], x[SLACK], mhat, what)
             
-            alpha = 1.0
-            descent = 0
-            n_backtrack = 0
+            ### line search for m
+            alpha_m = 1.0
+            descent_m = 0
+            n_backtrack_m = 0
             
-            mg_mhat = mg.inner(mhat)
+            mg_mhat = mg.inner(mhat)  # inner product in (5.8) from [1]
             
-            while descent == 0 and n_backtrack < max_backtracking_iter:
+            while descent_m == 0 and n_backtrack_m < max_backtracking_iter:
                 # update m and u
                 x_star[PARAMETER].zero()
                 x_star[PARAMETER].axpy(1., x[PARAMETER])
-                x_star[PARAMETER].axpy(alpha, mhat)
+                x_star[PARAMETER].axpy(alpha_m, mhat)
                 x_star[STATE].zero()
                 x_star[STATE].axpy(1., x[STATE])
                 self.model.solveFwd(x_star[STATE], x_star)
                 
-                cost_new, reg_new, misfit_new = self.model.cost(x_star)
+                cost_new, smooth_reg_new, nonsmooth_reg_new, misfit_new = self.model.cost(x_star)
                   
                 # Check if armijo conditions are satisfied
-                if (cost_new < cost_old + alpha * c_armijo * mg_mhat) or (-mg_mhat <= self.parameters["gdm_tolerance"]):
+                if (cost_new < cost_old + alpha_m * c_armijo * mg_mhat) or (-mg_mhat <= self.parameters["gdm_tolerance"]):
                     cost_old = cost_new
-                    descent = 1
+                    descent_m = 1
                     x[PARAMETER].zero()
                     x[PARAMETER].axpy(1., x_star[PARAMETER])
                     x[STATE].zero()
                     x[STATE].axpy(1., x_star[STATE])
                 else:
-                    n_backtrack += 1
-                    alpha *= 0.5
-                            
-            if(print_level >= 0) and (self.it == 1):
-                print( "\n{0:3} {1:3} {2:15} {3:15} {4:15} {5:15} {6:14} {7:14} {8:14}".format(
-                      "It", "cg_it", "cost", "misfit", "reg", "(g,dm)", "||g||L2", "alpha", "tolcg") )
-                
-            if print_level >= 0:
-                print( "{0:3d} {1:3d} {2:15e} {3:15e} {4:15e} {5:15e} {6:14e} {7:14e} {8:14e}".format(
-                        self.it, HessApply.ncalls, cost_new, misfit_new, reg_new, mg_mhat, gradnorm, alpha, tolcg) )
-                
-            if self.callback:
-                self.callback(self.it, x)
-                
-                
-            if n_backtrack == max_backtracking_iter:
+                    n_backtrack_m += 1
+                    alpha_m *= 0.5
+            
+            # if backtracking for m failed, exit
+            if n_backtrack_m == max_backtracking_iter:
                 self.converged = False
                 self.reason = 2
                 break
             
+            ### line search for w
+            alpha_w = 1.0
+            descent_w = 0
+            n_backtrack_w = 0
+            
+            while descent_w == 0 and n_backtrack_w < max_backtracking_iter:
+                # update w and u
+                x_star[SLACK].zero()
+                x_star[SLACK].axpy(1., x[SLACK])
+                x_star[SLACK].axpy(alpha_w, what)
+                
+                x_star[STATE].zero()
+                x_star[STATE].axpy(1., x[STATE])
+                
+                # todo: check that this calculation works
+                norm_w = self.model.nsprior.wnorm(x_star[SLACK])
+                if norm_w.vector().norm("linf") <= 1:
+                    # descent direction found, update the slack variable
+                    descent_w = 1
+                    x[SLACK].zero()
+                    x[SLACK].axpy(1., x_star[SLACK])
+                else:
+                    n_backtrack_w += 1
+                    alpha_w *= 0.5
+            
+            # if backtracking for w failed, exit
+            if n_backtrack_m == max_backtracking_iter:
+                self.converged = False
+                self.reason = 3
+                break
+            
+            if(print_level >= 0) and (self.it == 1):
+                print( "\n{0:3} {1:3} {2:15} {3:15} {4:15} {5:15} {6:15} {7:14} {8:14} {9:14}".format(
+                      "It", "cg_it", "cost", "misfit", "s reg", "ns reg", "(g,dm)", "||g||L2", "alpha", "tolcg") )
+                
+            if print_level >= 0:
+                print( "{0:3d} {1:3d} {2:15e} {3:15e} {4:15e} {5:15e} {6:14e} {7:14e} {8:14e} {9:14e}".format(
+                        self.it, HessApply.ncalls, cost_new, misfit_new, smooth_reg_new, nonsmooth_reg_new, mg_mhat, gradnorm, alpha_m, tolcg) )
+                
+            if self.callback:
+                self.callback(self.it, x)
+            
             if -mg_mhat <= self.parameters["gdm_tolerance"]:
                 self.converged = True
-                self.reason = 3
+                self.reason = 4
                 break
                             
         self.final_grad_norm = gradnorm

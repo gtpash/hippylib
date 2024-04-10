@@ -174,7 +174,7 @@ class ModelNS:
         self.problem.solveAdj(out, x, rhs)
     
     
-    def evalGradientParameter(self,x, mg, which=[True, True, True]):
+    def evalGradientParameter(self,x, mg):
         """
         Evaluate the gradient for the variational parameter equation at the point :code:`x=[u,m,p,w]`.
 
@@ -190,20 +190,26 @@ class ModelNS:
         """ 
         tmp = self.generate_vector(PARAMETER)
         
-        if which[0]:
+        if self.which[0]:
             self.problem.evalGradientParameter(x, mg)
             self.misfit.grad(PARAMETER,x,tmp)
             mg.axpy(1., tmp)
         
-        if which[1]:
+        if self.which[1]:
             self.prior.grad(x[PARAMETER], tmp)
             mg.axpy(1., tmp)
             
-        if which[2]:
+        if self.which[2]:
             self.nsprior.grad(x[PARAMETER], tmp)
             mg.axpy(1., tmp)
         
-        self.prior.Msolver.solve(tmp, mg)
+        if self.prior is not None:
+            self.prior.Msolver.solve(tmp, mg)
+        elif self.nsprior is not None:
+            self.nsprior.Msolver.solve(tmp, mg)
+        else:
+            raise ValueError("No prior with mass matrix solver defined.")
+            
         #self.prior.Rsolver.solve(tmp, mg)
         return math.sqrt(mg.inner(tmp))
         
@@ -379,7 +385,7 @@ class ModelNS:
             return self.prior.Rsolver
         elif self.nsprior is not None and self.which[2]:
             # return solver object for the non-smooth portion + bit of mass matrix
-            return self.nsprior.Psolver
+            return self.nsprior.Psolver()
         else:
             raise ValueError("No preconditioner defined.")
     

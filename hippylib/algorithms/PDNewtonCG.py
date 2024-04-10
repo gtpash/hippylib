@@ -274,9 +274,8 @@ class ReducedSpacePDNewtonCG:
                 x_star[STATE].zero()
                 x_star[STATE].axpy(1., x[STATE])
                 
-                # todo: check that this calculation works
                 norm_w = self.model.nsprior.wnorm(x_star[SLACK])
-                if norm_w.vector().norm("linf") <= 1:
+                if norm_w.norm("linf") <= 1:
                     # descent direction found, update the slack variable
                     descent_w = 1
                     x[SLACK].zero()

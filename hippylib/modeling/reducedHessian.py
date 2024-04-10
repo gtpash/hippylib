@@ -209,17 +209,16 @@ class NSReducedHessian:
 
     - :code:`model`:               the object which contains the description of the problem.
     - :code:`misfit_only`:         a boolean flag that describes whenever the full Hessian or only the misfit component of the Hessian is used.
-    - :code:`which`:               a list of booleans that describes which part of the Hessian to compute: [misfit, smooth, nonsmooth].
     
     Type :code:`help(modelTemplate)` for more information on which methods model should implement.
     """
-    def __init__(self, model, which:List[bool]=[True, True, True]):
+    def __init__(self, model):
         """
         Construct the reduced Hessian Operator
         """
         self.model = model
-        self.gauss_newton_approx = self.model.gauss_newton_approx 
-        self.which = which
+        self.gauss_newton_approx = self.model.gauss_newton_approx
+        self.which = self.model.which
         self.ncalls = 0
         
         self.rhs_fwd = model.generate_vector(STATE)

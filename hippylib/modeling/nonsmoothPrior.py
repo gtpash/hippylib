@@ -42,14 +42,13 @@ class TVPrior:
         self.w_lin = None
         
         self.gauss_newton_approx = False  # by default don't use GN approximation to Hessian
-        
         self.peps = peps  # mass matrix perturbation for preconditioner
 
         # assemble mass matrix for parameter, slack variable, norm of slack variable
         self.rel_tol = rel_tol
         self.max_iter = max_iter
         self.m_trial, self.m_test, self.M, self.Msolver = self._setupM(self.Vhm)
-        self.w_trial, self.w_test, self.Mw, self.Mwsolver = self._setupM(self.Vhw)        
+        self.w_trial, self.w_test, self.Mw, self.Mwsolver = self._setupM(self.Vhw)
         self.wnorm_trial, self.wnorm_test, self.Mwnorm, self.Mwnormsolver = self._setupM(self.Vhwnorm)
 
 
@@ -84,6 +83,10 @@ class TVPrior:
             dl.Function: TV norm of m.
         """
         return dl.sqrt( dl.inner(dl.grad(m), dl.grad(m)) + self.beta)
+    
+    
+    def init_vector(self, x, dim):
+        self.M.init_vector(x, dim)
     
     
     def setLinearizationPoint(self, m:dl.Vector, w:dl.Vector, gauss_newton_approx:bool):
@@ -128,7 +131,11 @@ class TVPrior:
         dl.assemble(hessian_action_form, tensor=out)
     
     
-    def compute_w_hat(self, m, w, m_hat):
+    def compute_w_hat(self, m, w, m_hat, w_hat):
+        m = vector2Function(m, self.Vhm)
+        m_hat = vector2Function(m_hat, self.Vhm)
+        w = vector2Function(w, self.Vhw)
+        
         TVm = self._fTV(m)
         
         # symmetrized version of operator in (3.6) from [1]
@@ -141,14 +148,12 @@ class TVPrior:
         dw = dl.assemble( dl.inner(self.w_test, dw)*dl.dx )
         
         # project into appropriate space
-        out = dl.Vector(self.Mw.mpi_comm())
-        self.Mw.init_vector(out, 0)
-        self.Mwsolver.solve(out, dw)
-        
-        return out
+        self.Mwsolver.solve(w_hat, dw)
     
     
     def wnorm(self, w):
+        w = vector2Function(w, self.Vhw)
+        
         # compute functional and assemble
         nw = dl.inner(w, w)
         nw = dl.assemble( dl.inner(self.wnorm_test, nw)*dl.dx )
@@ -180,8 +185,8 @@ class TVPrior:
     
     
     def Psolver(self):
-        # set up the preconditioner
-        varfHTV = self.hess(self.m_lin, self.w_lin)
+        # set up the preconditioner for the Hessian
+        varfHTV = self.hess_action(self.m_lin, self.w_lin, self.m_trial)
         varfM = dl.inner(self.m_trial, self.m_test)*dl.dx
         varfP = varfHTV + self.peps*varfM
         

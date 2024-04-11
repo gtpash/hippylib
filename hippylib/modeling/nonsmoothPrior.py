@@ -192,7 +192,7 @@ class TVPrior:
         
         # assemble the preconditioner and set as operator for solver
         P = dl.assemble(varfP)
-        Psolver = PETScKrylovSolver(self.Vhm.mesh().mpi_comm(), "cg", "jacobi")
+        Psolver = PETScKrylovSolver(self.Vhm.mesh().mpi_comm(), "cg", "hypre_amg")
         Psolver.set_operator(P)
         Psolver.parameters["nonzero_initial_guess"] = False
         

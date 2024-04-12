@@ -97,6 +97,7 @@ class TVPrior:
     
     def cost(self, m):
         # (smoothed) TV functional
+        m = vector2Function(m, self.Vhm)
         return dl.assemble( self.alpha * self._fTV(m)*dl.dx )
     
     

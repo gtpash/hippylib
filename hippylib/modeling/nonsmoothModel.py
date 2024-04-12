@@ -123,7 +123,7 @@ class ModelNS:
         
         # if there is a nonsmooth portion, compute it
         if self.nsprior is not None and self.which[2]:
-            nonsmooth_reg_cost = self.nsprior.cost(vector2Function(x[PARAMETER], self.nsprior.Vhm))
+            nonsmooth_reg_cost = self.nsprior.cost(x[PARAMETER])
         else:
             nonsmooth_reg_cost = 0.
             

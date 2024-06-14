@@ -97,22 +97,15 @@ class SNES_VariationalSolver():
         self.snes.setFunction(self.problem.F, b.vec())
         self.snes.setJacobian(problem.J, J_mat.mat())
 
-    def set_pc_IS(self):
-        r""" set preconditioner index set - ignore if using mumps"""
-        pc=self.snes.ksp.pc
-        fields=[]
-        # index set for pressure components, e.g. V.sub(0)
-        i=0
-        subdofs=self.problem.V.sub(i).dofmap().dofs()
-        IS=PETSc.IS().createGeneral(subdofs)
-        fields.append((str(i), IS))
-        pc.setFieldSplitIS(*fields)
 
     def solve(self):
         self.snes.solve(None, self.problem.u.vector().vec())
+        return self.getIterationNumber(), self.getConvergedReason()
+
 
     def getConvergedReason(self):
         return self.snes.getConvergedReason()
+
 
     def getIterationNumber(self):
         return self.snes.getIterationNumber()

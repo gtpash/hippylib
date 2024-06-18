@@ -15,6 +15,7 @@
 # terms of the GNU General Public License (as published by the Free
 # Software Foundation) version 2.0 dated June 1991.
 
+import time
 import dolfin as dl
 import ufl
 import numpy as np
@@ -22,11 +23,12 @@ from .PDEProblem import PDEProblem
 from .variables import STATE, PARAMETER, ADJOINT
 from ..algorithms.linalg import Transpose 
 from ..algorithms.linSolvers import PETScLUSolver
+from ..algorithms.SNES import SNES_VariationalProblem, SNES_VariationalSolver
 from ..utils.vector2function import vector2Function
 from .timeDependentVector import TimeDependentVector
 
 class TimeDependentPDEVariationalProblem(PDEProblem):
-    def __init__(self, Vh, varf_handler, bc, bc0, u0, t_init, t_final, is_fwd_linear = False):
+    def __init__(self, Vh, varf_handler, bc, bc0, u0, t_init, t_final, is_fwd_linear=False, solver_params=None):
         """
         varf_handler class
         conds = [u0, fwd_bc, adj_bc] : initial condition, (essential) fwd_bc, (essential) adj_bc
@@ -60,12 +62,8 @@ class TimeDependentPDEVariationalProblem(PDEProblem):
         self.solver_adj_inc = None
 
         self.is_fwd_linear = is_fwd_linear
-        self.parameters = dl.NonlinearVariationalSolver.default_parameters()
-        #self.parameters['nonlinear_solver'] = 'snes'
-        #self.parameters['snes_solver']["absolute_tolerance"] = 1e-10
-        #self.parameters['snes_solver']["relative_tolerance"] = 1e-5
-        #self.parameters['snes_solver']["maximum_iterations"] = 100
-        #self.parameters['snes_solver']["report"] = True
+        
+        self.comm = self.Vh[STATE].mesh().mpi_comm()
 
         #TODO: Modify the TimeDependentVector init() to get rid of this (we don't always have mass matrix in mixed problems)
         self.M  = dl.assemble(dl.inner(dl.TrialFunction(self.Vh[STATE]), dl.TestFunction(self.Vh[ADJOINT]))*dl.dx)
@@ -139,6 +137,7 @@ class TimeDependentPDEVariationalProblem(PDEProblem):
             self.solverA = self._createLUSolver()
 
         u_old = dl.Function(self.Vh[STATE])
+        u_old.vector().zero()
         u_old.vector().axpy(1., self.init_cond.vector())
         out.store(u_old.vector(), self.t_init)
         
@@ -153,6 +152,10 @@ class TimeDependentPDEVariationalProblem(PDEProblem):
             
             for t in self.times[1:]:
                 
+                if self.comm.rank == 0:
+                    print(f"solving at time:\t{t}", flush=True)
+                start = time.perf_counter()
+                
                 A_form = ufl.lhs(self.varf(du, u_old, m, dp, t))
                 b_form = ufl.rhs(self.varf(du, u_old, m, dp, t))
                 self._set_time(self.fwd_bc, t)
@@ -164,24 +167,70 @@ class TimeDependentPDEVariationalProblem(PDEProblem):
                     dl.assemble_system(A_form, b_form, self.fwd_bc, A_tensor=A, b_tensor=b)
                     
                 self.solverA.set_operator(A)
+                
+                # breakpoint()
                 self.solverA.solve(u_vec, b)
 
                 out.store(u_vec, t)
                 u_old.vector().zero()
                 u_old.vector().axpy(1., u_vec)
+                
+                if self.comm.rank == 0:
+                    print(f"Time step took:\t{time.perf_counter()-start}", flush=True)
         else:
             m = vector2Function(x[PARAMETER], self.Vh[PARAMETER])
             u = dl.Function(self.Vh[STATE])
             dp = dl.TestFunction(self.Vh[ADJOINT])
             u_vec = self.generate_static_state()
 
-            u.assign(u_old)
+            # u.assign(u_old)
+            
+            u_old_old = dl.Function(self.Vh[STATE])  # for 3-point extrapolation in time
+            u_old_old.vector().axpy(1, u_old.vector())
+            
             for t in self.times[1:]:
+                if self.comm.rank == 0:
+                    print(f"solving at time:\t{t}", flush=True)
+                start = time.perf_counter()
+                
+                ############### DANGER ZONE ################
+                # SUPER HACKY CLIPPING, MIGHT NOT EVEN WORK FOR P1
+                # ONLY WORKS IN SERIAL
+                # u_old.vector().set_local(np.clip(u_old.vector().get_local(), 0, 1))
+                # u_old_old.vector().set_local(np.clip(u_old.vector().get_local(), 0, 1))
+                ############### DANGER ZONE ################
+                
+                # Richardson exptrapolation for initial guess, u = 2u_old - u_old_old
+                u.vector().zero()
+                u.vector().axpy(2., u_old.vector())
+                u.vector().axpy(-1., u_old_old.vector())
+                
+                # set up nonlinear problem
                 res_form = self.varf(u, u_old, m, dp, t)
                 self._set_time(self.fwd_bc, t)
-                dl.solve(res_form == 0, u, self.fwd_bc, solver_parameters=self.parameters)
+                
+                nl_problem = SNES_VariationalProblem(res_form, u, self.fwd_bc)
+                solver = SNES_VariationalSolver(nl_problem, self.comm)
+                solver.snes.setFromOptions()
+                
+                # J_form = dl.derivative(res_form, u)
+                # nl_problem = dl.NonlinearVariationalProblem(res_form, u, self.fwd_bc, J=J_form)
+                # solver = dl.NonlinearVariationalSolver(nl_problem)
+
+                # solver.parameters['nonlinear_solver'] = "snes"
+                # solver.parameters['snes_solver']['linear_solver'] = "cg"
+                # solver.parameters['snes_solver']['preconditioner'] = "petsc_amg"
+
+                niters, converged = solver.solve()
+                
+                if self.comm.rank == 0:
+                    print(f"I took {niters} iterations.", flush=True)
+                    print(f"Time step took:\t{time.perf_counter()-start}", flush=True)
+                # dl.solve(res_form == 0, u, self.fwd_bc)
                 out.store(u.vector(), t)
+                u_old_old.assign(u_old)
                 u_old.assign(u)
+                # breakpoint()
                 
 
     def solveAdj(self, out, x, adj_rhs):
@@ -562,14 +611,19 @@ class TimeDependentPDEVariationalProblem(PDEProblem):
         KKT[PARAMETER, ADJOINT] = self.applyCt
         KKT[i,j](dir, out)
         
-    def exportState(self, u, fname):
+    def exportState(self, u, fname, ic=False):
         ufun = dl.Function(self.Vh[STATE], name="state")
         with  dl.XDMFFile(fname) as fid:
             fid.parameters["functions_share_mesh"] = True
             fid.parameters["rewrite_function_mesh"] = False
-            for t in self.times[1:]:
-                u.retrieve(ufun.vector(), t)
-                fid.write(ufun, t)
+            if ic:
+                for t in self.times[0:]:
+                    u.retrieve(ufun.vector(), t)
+                    fid.write(ufun, t)
+            else:
+                for t in self.times[1:]:
+                    u.retrieve(ufun.vector(), t)
+                    fid.write(ufun, t)
 
 
     def _createLUSolver(self):

@@ -50,7 +50,9 @@ class TVPrior:
         self.m_trial, self.m_test, self.M, self.Msolver = self._setupM(self.Vhm)
         self.w_trial, self.w_test, self.Mw, self.Mwsolver = self._setupM(self.Vhw)
         self.wnorm_trial, self.wnorm_test, self.Mwnorm, self.Mwnormsolver = self._setupM(self.Vhwnorm)
-
+        
+        self.ncomp = self.Vhm.num_sub_spaces()        # number of components in the parameter
+        self.ndim = self.Vhm.mesh().topology().dim()  # number of spatial dimensions
 
     def _setupM(self, Vh:dl.FunctionSpace):
         # helper function to set up mass matrix, solver
@@ -116,11 +118,40 @@ class TVPrior:
         TVm = self._fTV(m)
         
         # symmetrized version of (5.2) from [1]
-        A = dl.Constant(1.)/TVm * ( dl.Identity(2) 
+        # A = dl.Constant(1.)/TVm * ( dl.Identity(2) 
+        #                             - dl.Constant(0.5)*dl.outer(w, dl.grad(m)/TVm)
+        #                             - dl.Constant(0.5)*dl.outer(dl.grad(m)/TVm, w) )
+        
+        Avarf = self.primal_hess_varf(m, w, TVm)
+        
+        return self.alpha * dl.inner(Avarf*dl.grad(m_dir), dl.grad(self.m_test))*dl.dx
+    
+    
+    def primal_hess_varf(self, m, w, TVm):
+        """Variational form of the symmetrized (5.1) and (5.2) from [1]
+        This is the primal Hessian.
+        """
+        
+        if self.ncomp == 0:
+            # only one parameter
+            Avarf = dl.Constant(1.)/TVm * ( dl.Identity(self.ndim) 
+                                    - dl.Constant(0.5)*dl.outer(w, dl.grad(m)/TVm)
+                                    - dl.Constant(0.5)*dl.outer(dl.grad(m)/TVm, w) )
+        else:
+            # todo: debug
+            i, j, k, l = ufl.indices(4)
+            eye_ndim = ufl.Identity(self.ndim)
+            eye_ncomp = ufl.Identity(self.ncomp)
+            eye = ufl.as_tensor(eye_ndim[i,k] * eye_ncomp[j,l], [i, j, k ,l])
+            
+            breakpoint()
+            
+            # Avarf = dl.Constant(1.)/TVm * ( eye - dl.sym( dl.dot(w, dl.nabla_grad(m) / TVm) ) )
+            Avarf = dl.Constant(1.)/TVm * ( eye
                                     - dl.Constant(0.5)*dl.outer(w, dl.grad(m)/TVm)
                                     - dl.Constant(0.5)*dl.outer(dl.grad(m)/TVm, w) )
         
-        return self.alpha * dl.inner(A*dl.grad(m_dir), dl.grad(self.m_test))*dl.dx
+        return Avarf
     
     
     def applyR(self, dm, out):
@@ -140,12 +171,13 @@ class TVPrior:
         TVm = self._fTV(m)
         
         # symmetrized version of operator in (3.6) from [1]
-        A = dl.Constant(1.)/TVm * ( dl.Identity(2) 
-                                   - dl.Constant(0.5)*dl.outer(w, dl.grad(m)/TVm)
-                                   - dl.Constant(0.5)*dl.outer(dl.grad(m)/TVm, w) )
+        # A = dl.Constant(1.)/TVm * ( dl.Identity(2) 
+        #                            - dl.Constant(0.5)*dl.outer(w, dl.grad(m)/TVm)
+        #                            - dl.Constant(0.5)*dl.outer(dl.grad(m)/TVm, w) )
+        Avarf = self.primal_hess_varf(m, w, TVm)
         
         # expression for incremental slack variable (3.6) from [1]
-        dw = A*dl.grad(m_hat) - w + dl.grad(m)/TVm
+        dw = Avarf*dl.grad(m_hat) - w + dl.grad(m)/TVm
         dw = dl.assemble( dl.inner(self.w_test, dw)*dl.dx )
         
         # project into appropriate space

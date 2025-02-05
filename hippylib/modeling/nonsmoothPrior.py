@@ -25,8 +25,9 @@ class TVPrior:
     """
     This class implements the primal-dual formulation for the total variation prior.
     
+    References:
+    [1] Chan, Tony F., Gene H. Golub, and Pep Mulet. "A nonlinear primal-dual method for total variation-based image restoration." SIAM journal on scientific computing 20.6 (1999): 1964-1977.
     """
-    # [1] Chan, Tony F., Gene H. Golub, and Pep Mulet. "A nonlinear primal-dual method for total variation-based image restoration." SIAM journal on scientific computing 20.6 (1999): 1964-1977.
     
     # primal-dual implementation for (vector) total variation prior
     def __init__(self, Vhm:dl.FunctionSpace, Vhw:dl.FunctionSpace, Vhwnorm:dl.FunctionSpace, alpha:float, beta:float, peps:float=1e-3, rel_tol:float=1e-12, max_iter:int=100):
@@ -117,41 +118,38 @@ class TVPrior:
     def hess_action(self, m, w, m_dir):
         TVm = self._fTV(m)
         
-        # symmetrized version of (5.2) from [1]
-        # A = dl.Constant(1.)/TVm * ( dl.Identity(2) 
-        #                             - dl.Constant(0.5)*dl.outer(w, dl.grad(m)/TVm)
-        #                             - dl.Constant(0.5)*dl.outer(dl.grad(m)/TVm, w) )
+        Acoeff = self.primal_hess_coeff(m, w, TVm)
         
-        Avarf = self.primal_hess_varf(m, w, TVm)
-        
-        return self.alpha * dl.inner(Avarf*dl.grad(m_dir), dl.grad(self.m_test))*dl.dx
+        if self.ncomp == 0:
+            return self.alpha * dl.inner(ufl.dot(Acoeff, dl.grad(m_dir)), dl.grad(self.m_test))*dl.dx
+        else:
+            # tensor contraction for vector case
+            i,j,k,l = ufl.indices(4)
+            return self.alpha * ufl.grad(m_dir)[i,j]*Acoeff[i,j,k,l]*ufl.grad(self.m_test)[k,l] * dl.dx
     
     
-    def primal_hess_varf(self, m, w, TVm):
-        """Variational form of the symmetrized (5.1) and (5.2) from [1]
-        This is the primal Hessian.
+    
+    def primal_hess_coeff(self, m, w, TVm):
+        """Variational form of the primal Hessian, symmetrized (5.1) and (5.2) from [1]
         """
         
         if self.ncomp == 0:
             # only one parameter
-            Avarf = dl.Constant(1.)/TVm * ( dl.Identity(self.ndim) 
+            Acoeff = dl.Constant(1.)/TVm * ( dl.Identity(self.ndim) 
                                     - dl.Constant(0.5)*dl.outer(w, dl.grad(m)/TVm)
                                     - dl.Constant(0.5)*dl.outer(dl.grad(m)/TVm, w) )
         else:
-            # todo: debug
+            # shape should be (ncomp, ndim, ncomp, ndim) to be compatible with the gradient
             i, j, k, l = ufl.indices(4)
-            eye_ndim = ufl.Identity(self.ndim)
             eye_ncomp = ufl.Identity(self.ncomp)
-            eye = ufl.as_tensor(eye_ndim[i,k] * eye_ncomp[j,l], [i, j, k ,l])
+            eye_ndim = ufl.Identity(self.ndim)
+            eye = ufl.as_tensor(eye_ncomp[i, k] * eye_ndim[j, l], [i, j, k, l])
             
-            breakpoint()
-            
-            # Avarf = dl.Constant(1.)/TVm * ( eye - dl.sym( dl.dot(w, dl.nabla_grad(m) / TVm) ) )
-            Avarf = dl.Constant(1.)/TVm * ( eye
+            Acoeff = dl.Constant(1.)/TVm * ( eye
                                     - dl.Constant(0.5)*dl.outer(w, dl.grad(m)/TVm)
                                     - dl.Constant(0.5)*dl.outer(dl.grad(m)/TVm, w) )
         
-        return Avarf
+        return Acoeff
     
     
     def applyR(self, dm, out):
@@ -174,10 +172,16 @@ class TVPrior:
         # A = dl.Constant(1.)/TVm * ( dl.Identity(2) 
         #                            - dl.Constant(0.5)*dl.outer(w, dl.grad(m)/TVm)
         #                            - dl.Constant(0.5)*dl.outer(dl.grad(m)/TVm, w) )
-        Avarf = self.primal_hess_varf(m, w, TVm)
+        Acoeff = self.primal_hess_coeff(m, w, TVm)
         
         # expression for incremental slack variable (3.6) from [1]
-        dw = Avarf*dl.grad(m_hat) - w + dl.grad(m)/TVm
+        if self.ncomp == 0:
+            dw = Acoeff*dl.grad(m_hat) - w + dl.grad(m)/TVm
+        else:
+            # tensor contraction for vector case
+            i,j,k,l = ufl.indices(4)
+            dw = ufl.as_tensor(Acoeff[i,j,k,l] * dl.grad(m_hat)[k,l], [i,j]) - w + dl.grad(m)/TVm
+        
         dw = dl.assemble( dl.inner(self.w_test, dw)*dl.dx )
         
         # project into appropriate space

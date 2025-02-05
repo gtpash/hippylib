@@ -21,6 +21,7 @@ from .pointwiseObservation import assemblePointwiseObservation
 from .variables import STATE, PARAMETER
 from ..algorithms.linalg import Transpose
 from ..utils.deprecate import deprecated
+from ..utils import vector2Function
 import numpy as np
 
 class Misfit(object):
@@ -328,6 +329,47 @@ class ContinuousStateObservation(Misfit):
         else:
             out.zero() 
 
+class NonGaussianContinuousMisfit(object):
+
+    def __init__(self, Vh, form):
+        self.Vh = Vh
+        self.form = form
+        
+        self.x_lin_fun = None
+        self.x_test = [dl.TestFunction(Vh[STATE]), dl.TestFunction(Vh[PARAMETER])]
+        self.gauss_newton_approx = False
+        
+        
+    def cost(self,x):
+        u_fun = vector2Function(x[STATE], self.Vh[STATE])
+        m_fun = vector2Function(x[PARAMETER], self.Vh[PARAMETER])
+        
+        return dl.assemble(self.form(u_fun, m_fun))
+        
+    def grad(self, i, x, out):
+        out.zero()
+        
+        u_fun = vector2Function(x[STATE], self.Vh[STATE])
+        m_fun = vector2Function(x[PARAMETER], self.Vh[PARAMETER])
+        x_fun = [u_fun, m_fun]
+        
+        dl.assemble(ufl.derivative( self.form(*x_fun), x_fun[i], self.x_test[i]), tensor=out )
+
+            
+    def setLinearizationPoint(self,x, gauss_newton_approx=False):
+        u_fun = vector2Function(x[STATE], self.Vh[STATE])
+        m_fun = vector2Function(x[PARAMETER], self.Vh[PARAMETER])
+        self.x_lin_fun = [u_fun, m_fun]
+        self.gauss_newton_approx = gauss_newton_approx 
+        
+    def apply_ij(self,i,j, dir, out):
+        out.zero()
+        form = self.form(*self.x_lin_fun)
+        dir_fun = vector2Function(dir, self.Vh[j])
+        
+        action = ufl.derivative( ufl.derivative(form, self.x_lin_fun[i], self.x_test[i]), self.x_lin_fun[j], dir_fun )
+        
+        dl.assemble(action, tensor=out)
 
 class MultiStateMisfit(Misfit):
     def __init__(self, misfits):

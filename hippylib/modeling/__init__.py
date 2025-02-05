@@ -23,7 +23,7 @@ from .PDEProblem import PDEProblem
 from .PDEVariationalProblem import PDEVariationalProblem
 from .TimeDependentPDEVariationalProblem import TimeDependentPDEVariationalProblem
 from .prior import _Prior, LaplacianPrior, SqrtPrecisionPDE_Prior, BiLaplacianPrior, MollifiedBiLaplacianPrior, GaussianRealPrior, BiLaplacianComputeCoefficients, VectorBiLaplacianPrior
-from .misfit import Misfit, ContinuousStateObservation, DiscreteStateObservation, MultDiscreteStateObservation, MultiStateMisfit, PointwiseStateObservation, MultPointwiseStateObservation, MisfitTD
+from .misfit import Misfit, ContinuousStateObservation, DiscreteStateObservation, MultDiscreteStateObservation, MultiStateMisfit, PointwiseStateObservation, MultPointwiseStateObservation, MisfitTD, NonGaussianContinuousMisfit
 from .model import Model
 from .modelVerify import modelVerify
 from .reducedHessian import ReducedHessian, FDHessian

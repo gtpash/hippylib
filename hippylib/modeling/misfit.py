@@ -338,8 +338,9 @@ class MultiStateMisfit(Misfit):
         self.nmisfits += 1
         self.misfits.append(misfit)
 
-    def cost(self,x):
-        u, m, p = x
+    def cost(self, x):
+        u = x[STATE]
+        m = x[PARAMETER]
         c = 0.
         for i in range(self.nmisfits):
             c += self.misfits[i].cost([ u.data[i], m, None ] )
@@ -347,7 +348,8 @@ class MultiStateMisfit(Misfit):
     
     def grad(self, i, x, out):
         out.zero()
-        u, m, p = x
+        u = x[STATE]
+        m = x[PARAMETER]
         if i == STATE:
             for ii in range(self.nmisfits):
                 self.misfits[ii].grad(i, [ u.data[ii], m, None ], out.data[ii] )
@@ -357,8 +359,9 @@ class MultiStateMisfit(Misfit):
                 self.misfits[ii].grad(i, [ u.data[ii], m, None ], tmp )
                 out.axpy(1., tmp)
         
-    def setLinearizationPoint(self,x, gauss_newton_approx=False):
-        u, m, p = x
+    def setLinearizationPoint(self, x, gauss_newton_approx=False):
+        u = x[STATE]
+        m = x[PARAMETER]
         for ii in range(self.nmisfits):
             self.misfits[ii].setLinearizationPoint([ u.data[ii], m, None ], gauss_newton_approx)
         

@@ -168,10 +168,6 @@ class TVPrior:
         
         TVm = self._fTV(m)
         
-        # symmetrized version of operator in (3.6) from [1]
-        # A = dl.Constant(1.)/TVm * ( dl.Identity(2) 
-        #                            - dl.Constant(0.5)*dl.outer(w, dl.grad(m)/TVm)
-        #                            - dl.Constant(0.5)*dl.outer(dl.grad(m)/TVm, w) )
         Acoeff = self.primal_hess_coeff(m, w, TVm)
         
         # expression for incremental slack variable (3.6) from [1]

@@ -29,5 +29,7 @@ from .modelVerify import modelVerify
 from .reducedHessian import ReducedHessian, FDHessian
 from .nonsmoothPrior import TVPrior
 from .nonsmoothModel import ModelNS
+from .blockVector import BlockVector
+from .multiPDEProblem import MultiPDEProblem
 
 from .posterior import GaussianLRPosterior, LowRankHessian

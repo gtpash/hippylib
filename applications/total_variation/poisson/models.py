@@ -3,7 +3,7 @@ import dolfin as dl
 
 import sys
 import os
-sys.path.append( os.environ.get('HIPPYLIB_DEV_PATH') )
+sys.path.append( os.environ.get('HIPPYLIB_BASE_DIR', "../../../") )
 import hippylib as hp
 
 from utils import parameter2NoisyObservations

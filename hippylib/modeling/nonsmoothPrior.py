@@ -234,8 +234,4 @@ class TVPrior:
     
     def mpi_comm(self):
         return self.Vhm.mesh().mpi_comm()
-        
-    
-# class TVGaussianPrior:
-#     # primal implementation
-#     raise NotImplementedError("Fused TV+Gaussian Prior primal formulation not yet implemented.")
+

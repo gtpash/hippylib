@@ -5,7 +5,7 @@ import time
 
 import sys
 import os
-sys.path.append( os.environ.get('HIPPYLIB_DEV_PATH') )
+sys.path.append( os.environ.get('HIPPYLIB_BASE_DIR', "../../../") )
 import hippylib as hp
 
 from models import PoissonBox

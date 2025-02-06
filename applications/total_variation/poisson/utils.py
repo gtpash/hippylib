@@ -6,7 +6,7 @@ import numpy as np
 import dolfin as dl
 import pyvista as pv
 
-sys.path.append( os.environ.get('HIPPYLIB_BASE_DIR') )
+sys.path.append( os.environ.get('HIPPYLIB_BASE_DIR', "../../../") )
 import hippylib as hp
 
 def rprint(comm, *args, **kwargs):

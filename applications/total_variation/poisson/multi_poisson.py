@@ -6,7 +6,7 @@ import dolfin as dl
 import numpy as np
 import matplotlib.pyplot as plt
 
-sys.path.append( os.environ.get('HIPPYLIB_PATH') )
+sys.path.append( os.environ.get('HIPPYLIB_BASE_DIR', "../../../") )
 import hippylib as hp
 
 from models import MultiPoissonBox, splitCircle

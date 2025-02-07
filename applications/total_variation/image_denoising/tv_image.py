@@ -36,6 +36,7 @@ FIG_DIR = "figs/image"
 os.makedirs(FIG_DIR, exist_ok=True)  # ensure figure directory exists
 
 ## set up the mesh, mpi communicator, and function spaces
+COMM = dl.MPI.comm_world
 img = sio.loadmat("circles.mat")["im"]
 Lx = 1.
 h = Lx/float(img.shape[0])
@@ -96,15 +97,11 @@ vmin = np.min(d.vector().get_local())
 vmax = np.max(d.vector().get_local())
 
 # show the images
-plt.plot()
-dl.plot(d)
-plt.savefig(os.path.join(FIG_DIR, "noisy.png"))
-plt.close()
+with dl.XDMFFile(COMM, os.path.join(FIG_DIR, "noisy.xdmf")) as xdmf:
+    xdmf.write(d)
 
-plt.plot()
-dl.plot(m_true)
-plt.savefig(os.path.join(FIG_DIR, "true.png"))
-plt.close()
+with dl.XDMFFile(COMM, os.path.join(FIG_DIR, "true.xdmf")) as xdmf:
+    xdmf.write(m_true)
 
 # set up the misfit (noise variance set to 1, since we don't scale misfit for image denoising)
 misfit = hp.ContinuousStateObservation(Vh=Vh[hp.STATE], dX=ufl.dx, data=d.vector(), noise_variance=1., bcs=[bc])
@@ -122,20 +119,20 @@ m.vector().zero()
 solver_params = hp.ReducedSpacePDNewtonCG_ParameterList()
 solver_params["max_iter"] = 100
 solver_params["cg_max_iter"] = 75
+if COMM.rank != 0:
+    solver_params["print_level"] = -1
 solver = hp.ReducedSpacePDNewtonCG(model, parameters=solver_params)
 
 start = time.perf_counter()
 x = solver.solve([None, m.vector(), None, None])
-print(f"Nonlinear solve took:\t{(time.perf_counter()-start)/60:.2f} minutes", flush=True)
-
-print("Solver convergence criterion", flush=True)
-print(solver.termination_reasons[solver.reason])
+if COMM.rank == 0:
+    print(f"Nonlinear solve took:\t{(time.perf_counter()-start)/60:.2f} minutes", flush=True)
+    print("Solver convergence criterion", flush=True)
+    print(solver.termination_reasons[solver.reason])
 
 xfunname = ["state", "parameter", "adjoint"]
 xfun = [hp.vector2Function(x[i], Vh[i], name=xfunname[i]) for i in range(len(Vh))]
 
 # show off your denoised image
-plt.plot()
-dl.plot(xfun[hp.PARAMETER])
-plt.savefig(os.path.join(FIG_DIR, "denoised.png"))
-plt.close()
+with dl.XDMFFile(COMM, os.path.join(FIG_DIR, "denoised.xdmf")) as xdmf:
+    xdmf.write(xfun[hp.PARAMETER])

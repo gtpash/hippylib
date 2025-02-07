@@ -10,7 +10,7 @@ sys.path.append( os.environ.get('HIPPYLIB_BASE_DIR', "../../../") )
 import hippylib as hp
 
 from models import PoissonBox, splitCircle
-from utils import parameter2NoisyObservations, plotPointwiseObs
+from utils import parameter2NoisyObservations
 
 ## constants, initializations
 VERBOSE = True
@@ -26,6 +26,8 @@ DO_LCURVE = False
 os.makedirs("figs/imp", exist_ok=True)  # ensure figure directory exists
 os.makedirs("mesh", exist_ok=True)  # ensure mesh directory exists
 NDIM = 64
+
+COMM = dl.MPI.comm_world
 
 C = [0.5, 0.5]
 R = 0.4
@@ -171,11 +173,16 @@ p3.misfit = hp.DiscreteStateObservation(B=B3, data=p3.p2o.noisy_data, noise_vari
 MESHFPATH = os.path.join("mesh", "unitsquare.xdmf")
 with dl.XDMFFile(MESHFPATH) as fid:
     fid.write(p1.Vh[hp.STATE].mesh())
-    
-plotPointwiseObs(p1.Vh, p1.mtrue, B1, MESHFPATH, fpath="figs/imp/p1_mtrue.png", name="Log Parameter", clim=CLIM)
-plotPointwiseObs(p2.Vh, p2.mtrue, B2, MESHFPATH, fpath="figs/imp/p2_mtrue.png", name="Log Parameter", clim=CLIM)
-plotPointwiseObs(p3.Vh, p3.mtrue, B3, MESHFPATH, fpath="figs/imp/p3_mtrue.png", name="Log Parameter", clim=CLIM)
 
+with dl.XDMFFile(COMM, "figs/imp/p1_mtrue.xdmf") as fid:
+    fid.write(p1.mtrue)
+
+with dl.XDMFFile(COMM, "figs/imp/p2_mtrue.xdmf") as fid:
+    fid.write(p2.mtrue)
+
+with dl.XDMFFile(COMM, "figs/imp/p3_mtrue.xdmf") as fid:
+    fid.write(p3.mtrue)
+    
 # solve for the true states and plot
 xtmp = [p1.pde.generate_state(), p1.mtrue.vector(), None]
 p1.pde.solveFwd(xtmp[hp.STATE], xtmp)
@@ -183,21 +190,27 @@ p1.pde.solveFwd(xtmp[hp.STATE], xtmp)
 uf = dl.Function(p1.Vh[hp.STATE])
 uf.vector().zero()
 uf.vector().axpy(1., xtmp[hp.STATE])
-plotPointwiseObs(p1.Vh, uf, B1, MESHFPATH, fpath="figs/imp/p1_utrue.png", name="State")
+
+with dl.XDMFFile(COMM, "figs/imp/p1_utrue.xdmf") as fid:
+    fid.write(uf)
 
 xtmp = [p2.pde.generate_state(), p2.mtrue.vector(), None]
 p2.pde.solveFwd(xtmp[hp.STATE], xtmp)
 
 uf.vector().zero()
 uf.vector().axpy(1., xtmp[hp.STATE])
-plotPointwiseObs(p2.Vh, uf, B2, MESHFPATH, fpath="figs/imp/p2_utrue.png", name="State")
+
+with dl.XDMFFile(COMM, "figs/imp/p2_utrue.xdmf") as fid:
+    fid.write(uf)
 
 xtmp = [p3.pde.generate_state(), p3.mtrue.vector(), None]
 p3.pde.solveFwd(xtmp[hp.STATE], xtmp)
 
 uf.vector().zero()
 uf.vector().axpy(1., xtmp[hp.STATE])
-plotPointwiseObs(p3.Vh, uf, B3, MESHFPATH, fpath="figs/imp/p3_utrue.png", name="State")
+
+with dl.XDMFFile(COMM, "figs/imp/p3_utrue.xdmf") as fid:
+    fid.write(uf)
 
 ##################################################
 # Solve the problems individually
@@ -212,6 +225,8 @@ solver_params = hp.ReducedSpacePDNewtonCG_ParameterList()
 solver_params["max_iter"] = MAX_ITER
 solver_params["cg_max_iter"] = CG_MAX_ITER
 solver_params["LS"]["max_backtracking_iter"] = MAX_BACKTRACK
+if COMM.rank != 0:
+    solver_params["print_level"] = -1
 
 # set up the model describing the inverse problem
 tvprior1 = hp.TVPrior(Vhm, Vhw, Vhwnorm, ALPHA, BETA, peps=PEPS*ALPHA)
@@ -267,25 +282,30 @@ _, _, reg3, misfit3 = model3.cost(x3)
 mf = dl.Function(p1.Vh[hp.PARAMETER])
 mf.vector().zero()
 mf.vector().axpy(1., x1[hp.PARAMETER])
-plotPointwiseObs(p1.Vh, mf, B1, MESHFPATH, fpath="figs/imp/p1_mreconstruct.png", name="Log Parameter")
+with dl.XDMFFile(COMM, "figs/imp/p1_mreconstruct.xdmf") as fid:
+    fid.write(mf)
 
 uf.vector().zero()
 uf.vector().axpy(1., x1[hp.STATE])
-plotPointwiseObs(p1.Vh, uf, B1, MESHFPATH, fpath="figs/imp/p1_infer_state.png")
+with dl.XDMFFile(COMM, "figs/imp/p1_infer_state.xdmf") as fid:
+    fid.write(uf)
 
 mf.vector().zero()
 mf.vector().axpy(1., x2[hp.PARAMETER])
-plotPointwiseObs(p2.Vh, mf, B2, MESHFPATH, fpath="figs/imp/p2_mreconstruct.png", name="Log Parameter", clim=CLIM)
+with dl.XDMFFile(COMM, "figs/imp/p2_mreconstruct.xdmf") as fid:
+    fid.write(mf)
 
 uf.vector().zero()
 uf.vector().axpy(1., x2[hp.STATE])
-plotPointwiseObs(p2.Vh, uf, B2, MESHFPATH, fpath="figs/imp/p2_infer_state.png")
+with dl.XDMFFile(COMM, "figs/imp/p2_infer_state.xdmf") as fid:
+    fid.write(uf)
 
 mf.vector().zero()
 mf.vector().axpy(1., x3[hp.PARAMETER])
-plotPointwiseObs(p3.Vh, mf, B3, MESHFPATH, fpath="figs/imp/p3_mreconstruct.png", name="Log Parameter", clim=CLIM)
-
+with dl.XDMFFile(COMM, "figs/imp/p3_mreconstruct.xdmf") as fid:
+    fid.write(mf)
+    
 uf.vector().zero()
 uf.vector().axpy(1., x3[hp.STATE])
-plotPointwiseObs(p3.Vh, uf, B3, MESHFPATH, fpath="figs/imp/p3_infer_state.png")
-
+with dl.XDMFFile(COMM, "figs/imp/p3_infer_state.xdmf") as fid:
+    fid.write(uf)

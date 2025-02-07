@@ -128,17 +128,14 @@ obs_fun = dl.project(ug_fun*mg_fun, qpact.Vh[hp.STATE])
 obs_fun.rename("obs", "obs")
 
 # visualization
-hp.nb.plot(mg_fun)
-plt.savefig(os.path.join(FIG_DIR, "param_reconstruction_gaussian.png"))
-plt.close()
+with dl.XDMFFile(COMM, os.path.join(FIG_DIR, "param_reconstruction_gaussian.xdmf")) as fid:
+    fid.write(mg_fun)
 
-hp.nb.plot(ug_fun)
-plt.savefig(os.path.join(FIG_DIR, "state_reconstruction_gaussian.png"))
-plt.close()
+with dl.XDMFFile(COMM, os.path.join(FIG_DIR, "state_reconstruction_gaussian.xdmf")) as fid:
+    fid.write(ug_fun)
 
-hp.nb.plot(obs_fun)
-plt.savefig(os.path.join(FIG_DIR, "obs_reconstruction_gaussian.png"))
-plt.close()
+with dl.XDMFFile(COMM, os.path.join(FIG_DIR, "obs_reconstruction_gaussian.xdmf")) as fid:
+    fid.write(obs_fun)
 
 ##################################################
 # setup the TV prior and primal-dual solver
@@ -152,6 +149,8 @@ solver_params = hp.ReducedSpacePDNewtonCG_ParameterList()
 solver_params["max_iter"] = MAX_ITER
 solver_params["cg_max_iter"] = CG_MAX_ITER
 solver_params["LS"]["max_backtracking_iter"] = MAX_BACKTRACK
+if COMM.rank != 0:
+    solver_params["print_level"] = -1
 
 model = hp.ModelNS(qpact.pde, misfit, None, tvprior, which=TVONLY)
 solver = hp.ReducedSpacePDNewtonCG(model, parameters=solver_params)
@@ -209,14 +208,11 @@ obstv_fun = dl.project(utv_fun*mtv_fun, qpact.Vh[hp.STATE])
 obstv_fun.rename("obs", "obs")
 
 # visualization
-hp.nb.plot(mtv_fun)
-plt.savefig(os.path.join(FIG_DIR, "param_reconstruction_tv.png"))
-plt.close()
+with dl.XDMFFile(COMM, os.path.join(FIG_DIR, "param_reconstruction_tv.xdmf")) as fid:
+    fid.write(mtv_fun)
 
-hp.nb.plot(utv_fun)
-plt.savefig(os.path.join(FIG_DIR, "state_reconstruction_tv.png"))
-plt.close()
+with dl.XDMFFile(COMM, os.path.join(FIG_DIR, "state_reconstruction_tv.xdmf")) as fid:
+    fid.write(utv_fun)
 
-hp.nb.plot(obstv_fun)
-plt.savefig(os.path.join(FIG_DIR, "obs_reconstruction_tv.png"))
-plt.close()
+with dl.XDMFFile(COMM, os.path.join(FIG_DIR, "obs_reconstruction_tv.xdmf")) as fid:
+    fid.write(obstv_fun)

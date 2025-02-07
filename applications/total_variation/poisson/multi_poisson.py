@@ -28,6 +28,8 @@ os.makedirs("mesh", exist_ok=True)  # ensure mesh directory exists
 NDIM = 64
 NPOISSON = 3
 
+COMM = dl.MPI.comm_world
+
 # parameters for the split circle
 C = [0.5, 0.5]
 R = 0.4
@@ -92,9 +94,15 @@ with dl.XDMFFile(MESHFPATH) as fid:
     fid.write(mp.Vh[hp.STATE].mesh())
 
 m1, m2, m3 = mtrue.split()
-plotPointwiseObs(mp.Vh, m1, B1, MESHFPATH, fpath="figs/multi_poisson/p1_mtrue.png", name="Log Parameter", clim=CLIM)
-plotPointwiseObs(mp.Vh, m2, B2, MESHFPATH, fpath="figs/multi_poisson/p2_mtrue.png", name="Log Parameter", clim=CLIM)
-plotPointwiseObs(mp.Vh, m3, B3, MESHFPATH, fpath="figs/multi_poisson/p1_mtrue.png", name="Log Parameter", clim=CLIM)
+
+with dl.XDMFFile(COMM, "figs/multi_poisson/p1_mtrue.xdmf") as fid:
+    fid.write(m1)
+
+with dl.XDMFFile(COMM, "figs/multi_poisson/p2_mtrue.xdmf") as fid:
+    fid.write(m2)
+
+with dl.XDMFFile(COMM, "figs/multi_poisson/p3_mtrue.xdmf") as fid:
+    fid.write(m3)
 
 ##################################################
 # generate noisy observations, set up misfits
@@ -124,6 +132,8 @@ solver_params = hp.ReducedSpacePDNewtonCG_ParameterList()
 solver_params["max_iter"] = MAX_ITER
 solver_params["cg_max_iter"] = CG_MAX_ITER
 solver_params["LS"]["max_backtracking_iter"] = MAX_BACKTRACK
+if COMM.rank != 0:
+    solver_params["print_level"] = -1
 
 solver = hp.ReducedSpacePDNewtonCG(model, parameters=solver_params)
 
@@ -141,33 +151,45 @@ print(f"Total number of CG iterations:\t{solver.total_cg_iter}")
 
 # plot the reconstructed parameters
 msol = hp.vector2Function(xsol[hp.PARAMETER], mp.Vh[hp.PARAMETER], name="m_reconstruct")
-plotPointwiseObs(mp.Vh, mp.split_component(msol, 0), B1, MESHFPATH, fpath="figs/multi_poisson/p1_mreconstruct.png", name="Log Parameter")
-plotPointwiseObs(mp.Vh, mp.split_component(msol, 1), B2, MESHFPATH, fpath="figs/multi_poisson/p2_mreconstruct.png", name="Log Parameter")
-plotPointwiseObs(mp.Vh, mp.split_component(msol, 2), B3, MESHFPATH, fpath="figs/multi_poisson/p3_mreconstruct.png", name="Log Parameter")
+
+with dl.XDMFFile(COMM, "figs/multi_poisson/p1_mreconstruct.xdmf") as fid:
+    fid.write(mp.split_component(msol, 0))
+
+with dl.XDMFFile(COMM, "figs/multi_poisson/p2_mreconstruct.xdmf") as fid:
+    fid.write(mp.split_component(msol, 1))
+
+with dl.XDMFFile(COMM, "figs/multi_poisson/p3_mreconstruct.xdmf") as fid:
+    fid.write(mp.split_component(msol, 2))
 
 # plot the reconstructed states
 uf = dl.Function(mp.Vh[hp.STATE])
 uf.vector().zero()
 uf.vector().axpy(1., xsol[hp.STATE].data[0])
-plotPointwiseObs(mp.Vh, uf, B1, MESHFPATH, fpath="figs/multi_poisson/p1_infer_state.png")
+with dl.XDMFFile(COMM, "figs/multi_poisson/p1_infer_state.xdmf") as fid:
+    fid.write(uf)
 
 uf.vector().zero()
 uf.vector().axpy(1., xsol[hp.STATE].data[1])
-plotPointwiseObs(mp.Vh, uf, B2, MESHFPATH, fpath="figs/multi_poisson/p2_infer_state.png")
+with dl.XDMFFile(COMM, "figs/multi_poisson/p2_infer_state.xdmf") as fid:
+    fid.write(uf)
 
 uf.vector().zero()
 uf.vector().axpy(1., xsol[hp.STATE].data[2])
-plotPointwiseObs(mp.Vh, uf, B3, MESHFPATH, fpath="figs/multi_poisson/p3_infer_state.png")
+with dl.XDMFFile(COMM, "figs/multi_poisson/p3_infer_state.xdmf") as fid:
+    fid.write(uf)
 
 # plot the true states
 uf.vector().zero()
 uf.vector().axpy(1., utrue.data[0])
-plotPointwiseObs(mp.Vh, uf, B1, MESHFPATH, fpath="figs/multi_poisson/p1_true_state.png")
+with dl.XDMFFile(COMM, "figs/multi_poisson/p1_true_state.xdmf") as fid:
+    fid.write(uf)
 
 uf.vector().zero()
 uf.vector().axpy(1., utrue.data[1])
-plotPointwiseObs(mp.Vh, uf, B2, MESHFPATH, fpath="figs/multi_poisson/p2_true_state.png")
+with dl.XDMFFile(COMM, "figs/multi_poisson/p2_true_state.xdmf") as fid:
+    fid.write(uf)
 
 uf.vector().zero()
 uf.vector().axpy(1., utrue.data[2])
-plotPointwiseObs(mp.Vh, uf, B3, MESHFPATH, fpath="figs/multi_poisson/p3_true_state.png")
+with dl.XDMFFile(COMM, "figs/multi_poisson/p3_true_state.xdmf") as fid:
+    fid.write(uf)

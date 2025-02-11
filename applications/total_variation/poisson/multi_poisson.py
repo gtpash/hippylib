@@ -10,7 +10,7 @@ sys.path.append( os.environ.get('HIPPYLIB_BASE_DIR', "../../../") )
 import hippylib as hp
 
 from models import MultiPoissonBox, splitCircle
-from utils import add_noise_to_observations, plotPointwiseObs
+from utils import add_noise_to_observations
 
 # constants, initializations
 VERBOSE = True

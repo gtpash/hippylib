@@ -49,6 +49,7 @@ class ModelNS:
         self.prior = prior
         self.nsprior = nsprior
         self.which = which
+        # todo: add misfit_only boolean to complement which?
         self.gauss_newton_approx = False
         
         self.n_fwd_solve = 0

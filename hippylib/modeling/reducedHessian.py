@@ -219,6 +219,7 @@ class NSReducedHessian:
         self.model = model
         self.gauss_newton_approx = self.model.gauss_newton_approx
         self.which = self.model.which
+        # todo: add misfit_only boolean to complement which?
         self.ncalls = 0
         
         self.rhs_fwd = model.generate_vector(STATE)

@@ -25,8 +25,8 @@ from .TimeDependentPDEVariationalProblem import TimeDependentPDEVariationalProbl
 from .prior import _Prior, LaplacianPrior, SqrtPrecisionPDE_Prior, BiLaplacianPrior, MollifiedBiLaplacianPrior, GaussianRealPrior, BiLaplacianComputeCoefficients, VectorBiLaplacianPrior
 from .misfit import Misfit, ContinuousStateObservation, DiscreteStateObservation, MultDiscreteStateObservation, MultiStateMisfit, PointwiseStateObservation, MultPointwiseStateObservation, MisfitTD, NonGaussianContinuousMisfit
 from .model import Model
-from .modelVerify import modelVerify
-from .reducedHessian import ReducedHessian, FDHessian
+from .modelVerify import modelVerify, modelNSVerify
+from .reducedHessian import ReducedHessian, FDHessian, NSReducedHessian
 from .nonsmoothPrior import TVPrior
 from .nonsmoothModel import ModelNS
 from .blockVector import BlockVector

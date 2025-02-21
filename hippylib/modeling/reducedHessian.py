@@ -212,14 +212,14 @@ class NSReducedHessian:
     
     Type :code:`help(modelTemplate)` for more information on which methods model should implement.
     """
-    def __init__(self, model):
+    def __init__(self, model, misfit_only=False):
         """
         Construct the reduced Hessian Operator
         """
         self.model = model
         self.gauss_newton_approx = self.model.gauss_newton_approx
         self.which = self.model.which
-        # todo: add misfit_only boolean to complement which?
+        self.misfit_only = misfit_only
         self.ncalls = 0
         
         self.rhs_fwd = model.generate_vector(STATE)
@@ -280,15 +280,16 @@ class NSReducedHessian:
             self.model.solveAdjIncremental(self.phat, self.rhs_adj)
             self.model.applyCt(self.phat, y)
         
-        if self.which[1]:
-            # smooth regularization / prior
-            self.model.applyR(x,self.yhelp)
-            y.axpy(1., self.yhelp)
-            
-        if self.which[2]:
-            # non-smooth regularization / prior
-            self.model.applyRNS(x, self.yhelp)
-            y.axpy(1., self.yhelp)
+        if not self.misfit_only:
+            if self.which[1]:
+                # smooth regularization / prior
+                self.model.applyR(x,self.yhelp)
+                y.axpy(1., self.yhelp)
+                
+            if self.which[2]:
+                # non-smooth regularization / prior
+                self.model.applyRNS(x, self.yhelp)
+                y.axpy(1., self.yhelp)
 
         
     def TrueHessian(self, x, y):
@@ -310,13 +311,14 @@ class NSReducedHessian:
             self.model.applyWmu(self.uhat, self.yhelp)
             y.axpy(-1., self.yhelp)
             
-        if self.which[1]:
-            # smooth regularization / prior
-            self.model.applyR(x,self.yhelp)
-            y.axpy(1., self.yhelp)
+        if not self.misfit_only:
+            if self.which[1]:
+                # smooth regularization / prior
+                self.model.applyR(x,self.yhelp)
+                y.axpy(1., self.yhelp)
+                
+            if self.which[2]:
+                # non-smooth regularization / prior
+                self.model.applyRNS(x, self.yhelp)
+                y.axpy(1., self.yhelp)
             
-        if self.which[2]:
-            # non-smooth regularization / prior
-            self.model.applyRNS(x, self.yhelp)
-            y.axpy(1., self.yhelp)
-        

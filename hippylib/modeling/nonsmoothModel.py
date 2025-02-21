@@ -49,7 +49,6 @@ class ModelNS:
         self.prior = prior
         self.nsprior = nsprior
         self.which = which
-        # todo: add misfit_only boolean to complement which?
         self.gauss_newton_approx = False
         
         self.n_fwd_solve = 0
@@ -175,7 +174,7 @@ class ModelNS:
         self.problem.solveAdj(out, x, rhs)
     
     
-    def evalGradientParameter(self,x, mg):
+    def evalGradientParameter(self, x, mg, misfit_only=False):
         """
         Evaluate the gradient for the variational parameter equation at the point :code:`x=[u,m,p,w]`.
 
@@ -196,14 +195,15 @@ class ModelNS:
             self.misfit.grad(PARAMETER,x,tmp)
             mg.axpy(1., tmp)
         
-        if self.which[1]:
-            self.prior.grad(x[PARAMETER], tmp)
-            mg.axpy(1., tmp)
+        if not misfit_only:
+            if self.which[1]:
+                self.prior.grad(x[PARAMETER], tmp)
+                mg.axpy(1., tmp)
+                
+            if self.which[2]:
+                self.nsprior.grad(x[PARAMETER], tmp)
+                mg.axpy(1., tmp)
             
-        if self.which[2]:
-            self.nsprior.grad(x[PARAMETER], tmp)
-            mg.axpy(1., tmp)
-        
         if self.prior is not None:
             self.prior.Msolver.solve(tmp, mg)
         elif self.nsprior is not None:

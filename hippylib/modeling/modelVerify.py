@@ -125,11 +125,11 @@ def modelNSVerify(model, m0, is_quadratic=False, misfit_only=False, verbose=True
     cx = model.cost(x)
     
     grad_x = model.generate_vector(PARAMETER)
-    model.evalGradientParameter(x, grad_x)
+    model.evalGradientParameter(x, grad_x, misfit_only=misfit_only)
     grad_xh = grad_x.inner( h )
     
     model.setPointForHessianEvaluations(x)
-    H = NSReducedHessian(model)
+    H = NSReducedHessian(model, misfit_only=misfit_only)
     Hh = model.generate_vector(PARAMETER)
     H.mult(h, Hh)
     
@@ -156,7 +156,7 @@ def modelNSVerify(model, m0, is_quadratic=False, misfit_only=False, verbose=True
         
         #Check the Hessian
         grad_xplus = model.generate_vector(PARAMETER)
-        model.evalGradientParameter(x_plus, grad_xplus)
+        model.evalGradientParameter(x_plus, grad_xplus, misfit_only=misfit_only)
         
         err  = grad_xplus - grad_x
         err *= 1./my_eps

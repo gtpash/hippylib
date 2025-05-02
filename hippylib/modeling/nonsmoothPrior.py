@@ -351,7 +351,7 @@ class weightedVTVPrior:
         grad_form = dl.inner( self.alpha * dl.grad(m), dl.grad(self.m_test) ) / wvtv_form
         
         # assemble the UFL form to a vector, add to out
-        dl.assemble(grad_form, tensor=out)
+        dl.assemble(grad_form*dl.dx, tensor=out)
     
     
     def hess_action(self, m, w, m_dir):

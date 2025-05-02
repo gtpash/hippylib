@@ -27,7 +27,7 @@ from .misfit import Misfit, ContinuousStateObservation, DiscreteStateObservation
 from .model import Model
 from .modelVerify import modelVerify, modelNSVerify
 from .reducedHessian import ReducedHessian, FDHessian, NSReducedHessian
-from .nonsmoothPrior import TVPrior
+from .nonsmoothPrior import TVPrior, weightedVTVPrior
 from .nonsmoothModel import ModelNS
 from .blockVector import BlockVector
 from .multiPDEProblem import MultiPDEProblem

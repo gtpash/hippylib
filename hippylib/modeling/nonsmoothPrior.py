@@ -92,7 +92,7 @@ class TVPrior:
             Msolver.parameters["nonzero_initial_guess"] = False
         elif self.solver_type == "lu":
             self.Msolver = PETScLUSolver(Vh.mesh().mpi_comm(), method=self.lu_method)
-            self.Msolver.set_operator(self.M)
+            self.Msolver.set_operator(M)
             self.Msolver.parameters["symmetric"] = True
         else:
             raise ValueError(f"Unknown solver type {self.solver_type}")
@@ -351,7 +351,7 @@ class weightedVTVPrior:
             Msolver.parameters["nonzero_initial_guess"] = False
         elif self.solver_type == "lu":
             self.Msolver = PETScLUSolver(Vh.mesh().mpi_comm(), method=self.lu_method)
-            self.Msolver.set_operator(self.M)
+            self.Msolver.set_operator(M)
             self.Msolver.parameters["symmetric"] = True
         else:
             raise ValueError(f"Unknown solver type {self.solver_type}")

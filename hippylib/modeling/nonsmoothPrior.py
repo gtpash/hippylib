@@ -19,7 +19,7 @@ import dolfin as dl
 import ufl
 import numpy as np
 
-from ..algorithms.linSolvers import PETScKrylovSolver
+from ..algorithms.linSolvers import PETScKrylovSolver, PETScLUSolver
 from ..utils.vector2function import vector2Function
 
 class TVPrior:
@@ -31,7 +31,22 @@ class TVPrior:
     """
     
     # primal-dual implementation for (vector) total variation prior
-    def __init__(self, Vhm:dl.FunctionSpace, Vhw:dl.FunctionSpace, Vhwnorm:dl.FunctionSpace, alpha:float, beta:float, peps:float=1e-3, rel_tol:float=1e-12, max_iter:int=100):
+    def __init__(self, Vhm:dl.FunctionSpace, Vhw:dl.FunctionSpace, Vhwnorm:dl.FunctionSpace, alpha:float, beta:float, peps:float=1e-3, rel_tol:float=1e-12, max_iter:int=100, solver_type="krylov", lu_method="default"):
+        """Constructor for the TVPrior class.
+
+        Args:
+            Vhm (dl.FunctionSpace): Function space for the parameter.
+            Vhw (dl.FunctionSpace): Function space for slack variable.
+            Vhwnorm (dl.FunctionSpace): Function space for slack variable norm.
+            alpha (array-like): Weights for each component of wVTV functional.
+            beta (float): Smoothing parameter for the TV functional.
+            peps (float, optional): Mass matrix preconditioner scaling. Defaults to 1e-3.
+            rel_tol (float, optional): Relative tolerance for Krylov solver. Defaults to 1e-12.
+            max_iter (int, optional): Maximum number of iterations for Krylov solver. Defaults to 100.
+            solver_type (str, optional): type of solver to use for solving linear systems involving matrix. Options are "krylov" or "lu" (default is krylov).
+            lu_method (str, optional): method to use for the LU solver (used when :code:`solver_type == "lu"`, default is "default").
+        """
+        
         self.alpha = dl.Constant(alpha)
         self.beta = dl.Constant(beta)
         
@@ -49,6 +64,8 @@ class TVPrior:
         # assemble mass matrix for parameter, slack variable, norm of slack variable
         self.rel_tol = rel_tol
         self.max_iter = max_iter
+        self.solver_type = solver_type
+        self.lu_method = lu_method
         self.m_trial, self.m_test, self.M, self.Msolver = self._setupM(self.Vhm)
         self.w_trial, self.w_test, self.Mw, self.Mwsolver = self._setupM(self.Vhw)
         self.wnorm_trial, self.wnorm_test, self.Mwnorm, self.Mwnormsolver = self._setupM(self.Vhwnorm)
@@ -66,12 +83,19 @@ class TVPrior:
         M = dl.assemble(varfM)
         
         # set up PETSc solver object to apply M^{-1}
-        Msolver = PETScKrylovSolver(Vh.mesh().mpi_comm(), "cg", "jacobi")
-        Msolver.set_operator(M)
-        Msolver.parameters["maximum_iterations"] = self.max_iter
-        Msolver.parameters["relative_tolerance"] = self.rel_tol
-        Msolver.parameters["error_on_nonconvergence"] = True
-        Msolver.parameters["nonzero_initial_guess"] = False
+        if self.solver_type == "krylov":
+            Msolver = PETScKrylovSolver(Vh.mesh().mpi_comm(), "cg", "jacobi")
+            Msolver.set_operator(M)
+            Msolver.parameters["maximum_iterations"] = self.max_iter
+            Msolver.parameters["relative_tolerance"] = self.rel_tol
+            Msolver.parameters["error_on_nonconvergence"] = True
+            Msolver.parameters["nonzero_initial_guess"] = False
+        elif self.solver_type == "lu":
+            self.Msolver = PETScLUSolver(self.Vh.mesh().mpi_comm(), method=self.lu_method)
+            self.Msolver.set_operator(self.M)
+            self.Msolver.parameters["symmetric"] = True
+        else:
+            raise ValueError(f"Unknown solver type {self.solver_type}")
         
         # return objects
         return trial, test, M, Msolver
@@ -226,9 +250,16 @@ class TVPrior:
         
         # assemble the preconditioner and set as operator for solver
         P = dl.assemble(varfP)
-        Psolver = PETScKrylovSolver(self.Vhm.mesh().mpi_comm(), "cg", "hypre_amg")
-        Psolver.set_operator(P)
-        Psolver.parameters["nonzero_initial_guess"] = False
+        
+        if self.solver_type == "krylov":
+            Psolver = PETScKrylovSolver(self.Vhm.mesh().mpi_comm(), "cg", "hypre_amg")
+            Psolver.parameters["nonzero_initial_guess"] = False
+            Psolver.set_operator(P)
+        elif self.solver_type == "lu":
+            Psolver = PETScLUSolver(self.Vhm.mesh().mpi_comm(), method="default")
+            Psolver.set_operator(P)
+        else:
+            raise ValueError(f"Unknown solver type {self.solver_type}")
         
         return Psolver
     
@@ -250,7 +281,7 @@ class weightedVTVPrior:
     """
     
     # primal-dual implementation for (vector) total variation prior
-    def __init__(self, Vhm:dl.FunctionSpace, Vhw:dl.FunctionSpace, Vhwnorm:dl.FunctionSpace, alpha, beta:float, peps:float=1e-3, rel_tol:float=1e-12, max_iter:int=100):
+    def __init__(self, Vhm:dl.FunctionSpace, Vhw:dl.FunctionSpace, Vhwnorm:dl.FunctionSpace, alpha, beta:float, peps:float=1e-3, rel_tol:float=1e-12, max_iter:int=100, solver_type="krylov", lu_method="default"):
         """Constructor for the weightedTVPrior class.
 
         Args:
@@ -262,6 +293,8 @@ class weightedVTVPrior:
             peps (float, optional): Mass matrix preconditioner scaling. Defaults to 1e-3.
             rel_tol (float, optional): Relative tolerance for Krylov solver. Defaults to 1e-12.
             max_iter (int, optional): Maximum number of iterations for Krylov solver. Defaults to 100.
+            solver_type (str, optional): type of solver to use for solving linear systems involving matrix. Options are "krylov" or "lu" (default is krylov).
+            lu_method (str, optional): method to use for the LU solver (used when :code:`solver_type == "lu"`, default is "default").
         """
         
         # defensive checks to ensure the user is choosing the correct class.
@@ -285,6 +318,8 @@ class weightedVTVPrior:
         # assemble mass matrix for parameter, slack variable, norm of slack variable
         self.rel_tol = rel_tol
         self.max_iter = max_iter
+        self.solver_type = solver_type
+        self.lu_method = lu_method
         self.m_trial, self.m_test, self.M, self.Msolver = self._setupM(self.Vhm)
         self.w_trial, self.w_test, self.Mw, self.Mwsolver = self._setupM(self.Vhw)
         self.wnorm_trial, self.wnorm_test, self.Mwnorm, self.Mwnormsolver = self._setupM(self.Vhwnorm)
@@ -307,12 +342,19 @@ class weightedVTVPrior:
         M = dl.assemble(varfM)
         
         # set up PETSc solver object to apply M^{-1}
-        Msolver = PETScKrylovSolver(Vh.mesh().mpi_comm(), "cg", "jacobi")
-        Msolver.set_operator(M)
-        Msolver.parameters["maximum_iterations"] = self.max_iter
-        Msolver.parameters["relative_tolerance"] = self.rel_tol
-        Msolver.parameters["error_on_nonconvergence"] = True
-        Msolver.parameters["nonzero_initial_guess"] = False
+        if self.solver_type == "krylov":
+            Msolver = PETScKrylovSolver(Vh.mesh().mpi_comm(), "cg", "jacobi")
+            Msolver.set_operator(M)
+            Msolver.parameters["maximum_iterations"] = self.max_iter
+            Msolver.parameters["relative_tolerance"] = self.rel_tol
+            Msolver.parameters["error_on_nonconvergence"] = True
+            Msolver.parameters["nonzero_initial_guess"] = False
+        elif self.solver_type == "lu":
+            self.Msolver = PETScLUSolver(self.Vh.mesh().mpi_comm(), method=self.lu_method)
+            self.Msolver.set_operator(self.M)
+            self.Msolver.parameters["symmetric"] = True
+        else:
+            raise ValueError(f"Unknown solver type {self.solver_type}")
         
         # return objects
         return trial, test, M, Msolver
@@ -472,9 +514,16 @@ class weightedVTVPrior:
         
         # assemble the preconditioner and set as operator for solver
         P = dl.assemble(varfP)
-        Psolver = PETScKrylovSolver(self.Vhm.mesh().mpi_comm(), "cg", "hypre_amg")
-        Psolver.set_operator(P)
-        Psolver.parameters["nonzero_initial_guess"] = False
+        
+        if self.solver_type == "krylov":
+            Psolver = PETScKrylovSolver(self.Vhm.mesh().mpi_comm(), "cg", "hypre_amg")
+            Psolver.parameters["nonzero_initial_guess"] = False
+            Psolver.set_operator(P)
+        elif self.solver_type == "lu":
+            Psolver = PETScLUSolver(self.Vhm.mesh().mpi_comm(), method="default")
+            Psolver.set_operator(P)
+        else:
+            raise ValueError(f"Unknown solver type {self.solver_type}")
         
         return Psolver
     

@@ -91,7 +91,7 @@ class TVPrior:
             Msolver.parameters["error_on_nonconvergence"] = True
             Msolver.parameters["nonzero_initial_guess"] = False
         elif self.solver_type == "lu":
-            self.Msolver = PETScLUSolver(self.Vh.mesh().mpi_comm(), method=self.lu_method)
+            self.Msolver = PETScLUSolver(Vh.mesh().mpi_comm(), method=self.lu_method)
             self.Msolver.set_operator(self.M)
             self.Msolver.parameters["symmetric"] = True
         else:
@@ -350,7 +350,7 @@ class weightedVTVPrior:
             Msolver.parameters["error_on_nonconvergence"] = True
             Msolver.parameters["nonzero_initial_guess"] = False
         elif self.solver_type == "lu":
-            self.Msolver = PETScLUSolver(self.Vh.mesh().mpi_comm(), method=self.lu_method)
+            self.Msolver = PETScLUSolver(Vh.mesh().mpi_comm(), method=self.lu_method)
             self.Msolver.set_operator(self.M)
             self.Msolver.parameters["symmetric"] = True
         else:

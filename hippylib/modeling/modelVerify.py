@@ -108,6 +108,8 @@ def modelNSVerify(model, m0, is_quadratic=False, misfit_only=False, verbose=True
     It will produce two loglog plots of the finite difference checks for the gradient and for the Hessian.
     It will also check for symmetry of the Hessian.
     """
+    SLACK = 3  # index of the slack variable in the variable list
+    
     if misfit_only:
         model.which = [True, False, False]
         index = 3
@@ -120,6 +122,7 @@ def modelNSVerify(model, m0, is_quadratic=False, misfit_only=False, verbose=True
     
     x = model.generate_vector()
     x[PARAMETER] = m0
+    x[SLACK] = model.nsprior.compute_w(m0)
     model.solveFwd(x[STATE], x)
     model.solveAdj(x[ADJOINT], x)
     cx = model.cost(x)
@@ -148,6 +151,7 @@ def modelNSVerify(model, m0, is_quadratic=False, misfit_only=False, verbose=True
         x_plus = model.generate_vector()
         x_plus[PARAMETER].axpy(1., m0 )
         x_plus[PARAMETER].axpy(my_eps, h)
+        x_plus[SLACK] = model.nsprior.compute_w(x_plus[PARAMETER])
         model.solveFwd(x_plus[STATE],   x_plus)
         model.solveAdj(x_plus[ADJOINT], x_plus)
         

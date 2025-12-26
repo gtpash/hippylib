@@ -84,14 +84,14 @@ class TVPrior:
         
         # set up PETSc solver object to apply M^{-1}
         if self.solver_type == "krylov":
-            Msolver = PETScKrylovSolver(Vh.mesh().mpi_comm(), "cg", "jacobi")
+            Msolver = PETScKrylovSolver(self.mpi_comm(), "cg", "jacobi")
             Msolver.set_operator(M)
             Msolver.parameters["maximum_iterations"] = self.max_iter
             Msolver.parameters["relative_tolerance"] = self.rel_tol
             Msolver.parameters["error_on_nonconvergence"] = True
             Msolver.parameters["nonzero_initial_guess"] = False
         elif self.solver_type == "lu":
-            Msolver = PETScLUSolver(Vh.mesh().mpi_comm(), method=self.lu_method)
+            Msolver = PETScLUSolver(self.mpi_comm(), method=self.lu_method)
             Msolver.set_operator(M)
             Msolver.parameters["symmetric"] = True
         else:
@@ -217,7 +217,7 @@ class TVPrior:
         nw = dl.assemble( dl.inner(self.wnorm_test, nw)*dl.dx )
         
         # project into appropriate space
-        out = dl.Vector(self.Mwnorm.mpi_comm())
+        out = dl.Vector(self.mpi_comm())
         self.Mwnorm.init_vector(out, 0)
         self.Mwnormsolver.solve(out, nw)
         
@@ -236,7 +236,7 @@ class TVPrior:
         w = dl.grad(m)/TVm
         w = dl.assemble( dl.inner(self.w_test, w)*dl.dx )
         
-        out = dl.Vector(self.Mw.mpi_comm())
+        out = dl.Vector(self.mpi_comm())
         self.Mw.init_vector(out, 0)
         self.Mwsolver.solve(out, w)
         return out
@@ -252,11 +252,11 @@ class TVPrior:
         P = dl.assemble(varfP)
         
         if self.solver_type == "krylov":
-            Psolver = PETScKrylovSolver(self.Vhm.mesh().mpi_comm(), "cg", "hypre_amg")
+            Psolver = PETScKrylovSolver(self.mpi_comm(), "cg", "hypre_amg")
             Psolver.parameters["nonzero_initial_guess"] = False
             Psolver.set_operator(P)
         elif self.solver_type == "lu":
-            Psolver = PETScLUSolver(self.Vhm.mesh().mpi_comm(), method="default")
+            Psolver = PETScLUSolver(self.mpi_comm(), method="default")
             Psolver.set_operator(P)
         else:
             raise ValueError(f"Unknown solver type {self.solver_type}")
@@ -343,14 +343,14 @@ class weightedVTVPrior:
         
         # set up PETSc solver object to apply M^{-1}
         if self.solver_type == "krylov":
-            Msolver = PETScKrylovSolver(Vh.mesh().mpi_comm(), "cg", "jacobi")
+            Msolver = PETScKrylovSolver(self.mpi_comm(), "cg", "jacobi")
             Msolver.set_operator(M)
             Msolver.parameters["maximum_iterations"] = self.max_iter
             Msolver.parameters["relative_tolerance"] = self.rel_tol
             Msolver.parameters["error_on_nonconvergence"] = True
             Msolver.parameters["nonzero_initial_guess"] = False
         elif self.solver_type == "lu":
-            Msolver = PETScLUSolver(Vh.mesh().mpi_comm(), method=self.lu_method)
+            Msolver = PETScLUSolver(self.mpi_comm(), method=self.lu_method)
             Msolver.set_operator(M)
             Msolver.parameters["symmetric"] = True
         else:
@@ -476,7 +476,7 @@ class weightedVTVPrior:
         nw = dl.assemble( dl.inner(self.wnorm_test, nw)*dl.dx )
         
         # project into appropriate space
-        out = dl.Vector(self.Mwnorm.mpi_comm())
+        out = dl.Vector(self.mpi_comm())
         self.Mwnorm.init_vector(out, 0)
         self.Mwnormsolver.solve(out, nw)
         
@@ -498,7 +498,7 @@ class weightedVTVPrior:
         w = dl.grad(m) / wvtv_form
         w = dl.assemble( dl.inner(self.w_test, w)*dl.dx )
         
-        out = dl.Vector(self.Mw.mpi_comm())
+        out = dl.Vector(self.mpi_comm())
         self.Mw.init_vector(out, 0)
         self.Mwsolver.solve(out, w)
         return out
@@ -516,11 +516,11 @@ class weightedVTVPrior:
         P = dl.assemble(varfP)
         
         if self.solver_type == "krylov":
-            Psolver = PETScKrylovSolver(self.Vhm.mesh().mpi_comm(), "cg", "hypre_amg")
+            Psolver = PETScKrylovSolver(self.mpi_comm(), "cg", "hypre_amg")
             Psolver.parameters["nonzero_initial_guess"] = False
             Psolver.set_operator(P)
         elif self.solver_type == "lu":
-            Psolver = PETScLUSolver(self.Vhm.mesh().mpi_comm(), method=self.lu_method)
+            Psolver = PETScLUSolver(self.mpi_comm(), method=self.lu_method)
             Psolver.set_operator(P)
         else:
             raise ValueError(f"Unknown solver type {self.solver_type}")

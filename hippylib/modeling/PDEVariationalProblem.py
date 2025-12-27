@@ -54,6 +54,7 @@ class PDEVariationalProblem(PDEProblem):
         self.solver_adj_inc = None
         
         self.is_fwd_linear = is_fwd_linear
+        self.parameters = dl.NonlinearVariationalSolver.default_parameters()
         self.n_calls = {"forward": 0,
                         "adjoint":0 ,
                         "incremental_forward":0,
@@ -98,7 +99,7 @@ class PDEVariationalProblem(PDEProblem):
             p = dl.TestFunction(self.Vh[ADJOINT])
             res_form = self.varf_handler(u, m, p)
             try:
-                dl.solve(res_form == 0, u, self.bc)
+                dl.solve(res_form == 0, u, self.bc, solver_parameters=self.parameters)
             except:
                 raise ModelConvergenceError("solveFwd: Nonlinear forward problem could not be solved.")
             state.zero()

@@ -27,6 +27,7 @@ from .variables import STATE, PARAMETER, ADJOINT
 from ..algorithms.linalg import Transpose 
 from ..algorithms.linSolvers import PETScLUSolver
 from ..utils.vector2function import vector2Function
+from ..utils.warnings import ModelConvergenceError
 
 class PDEVariationalProblem(PDEProblem):
     def __init__(self, Vh, varf_handler, bc, bc0, is_fwd_linear = False):
@@ -87,13 +88,19 @@ class PDEVariationalProblem(PDEProblem):
             b_form = ufl.rhs(res_form)
             A, b = dl.assemble_system(A_form, b_form, bcs=self.bc)
             self.solver.set_operator(A)
-            self.solver.solve(state, b)
+            try:
+                self.solver.solve(state, b)
+            except:
+                raise ModelConvergenceError("solveFwd: Linear forward problem could not be solved.")
         else:
             u = vector2Function(x[STATE], self.Vh[STATE])
             m = vector2Function(x[PARAMETER], self.Vh[PARAMETER])
             p = dl.TestFunction(self.Vh[ADJOINT])
             res_form = self.varf_handler(u, m, p)
-            dl.solve(res_form == 0, u, self.bc)
+            try:
+                dl.solve(res_form == 0, u, self.bc)
+            except:
+                raise ModelConvergenceError("solveFwd: Nonlinear forward problem could not be solved.")
             state.zero()
             state.axpy(1., u.vector())
         

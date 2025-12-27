@@ -44,7 +44,7 @@ def ReducedSpacePDNewtonCG_ParameterList():
     parameters["abs_tolerance"]         = [1e-12, "we converge when sqrt(g,g) <= abs_tolerance"]
     parameters["gdm_tolerance"]         = [1e-18, "we converge when (g,dm) <= gdm_tolerance"]
     parameters["max_iter"]              = [20, "maximum number of iterations"]
-    parameters["globalization"]         = ["LS", "Globalization technique: line search (LS)  or trust region (TR)"]
+    parameters["globalization"]         = ["LS", "Globalization technique: line search (LS)"]
     parameters["print_level"]           = [0, "Control verbosity of printing screen"]
     parameters["GN_iter"]               = [5, "Number of Gauss Newton iterations before switching to Newton"]
     parameters["cg_coarse_tolerance"]   = [.5, "Coarsest tolerance for the CG method (Eisenstat-Walker)"]

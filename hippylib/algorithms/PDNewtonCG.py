@@ -36,8 +36,8 @@ def LS_ParameterList():
 
 def ReducedSpacePDNewtonCG_ParameterList():
     """
-    Generate a ParameterList for ReducedSpaceNewtonCG.
-    type: :code:`ReducedSpaceNewtonCG_ParameterList().showMe()` for default values and their descriptions
+    Generate a ParameterList for ReducedPDSpaceNewtonCG.
+    type: :code:`ReducedSpacePDNewtonCG_ParameterList().showMe()` for default values and their descriptions
     """
     parameters = {}
     parameters["rel_tolerance"]         = [1e-6, "we converge when sqrt(g,g)/sqrt(g_0,g_0) <= rel_tolerance"]

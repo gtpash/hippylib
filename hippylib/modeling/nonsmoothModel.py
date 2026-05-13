@@ -34,7 +34,7 @@ class ModelNS:
         
     """
     
-    def __init__(self, problem, misfit, prior=None, nsprior=None, which:List[bool]=[True, True, True]):
+    def __init__(self, problem, misfit, prior=None, nsprior=None, which:List[bool]=[True, True, True], varfM_handler=None):
         """
         Create a model given:
 
@@ -43,6 +43,7 @@ class ModelNS:
             - prior: the (smooth or Gaussian) prior component of the cost functional
             - nsprior: the non-smooth prior component of the cost functional
             - which: list that determines which parts of loss functional to use [misfit, smooth, nonsmooth]
+            - varfM_handler: function handler that returns the variational form of the mass matrix from the state list x = [u, m, p]
         """
         self.problem = problem
         self.misfit = misfit
@@ -50,6 +51,7 @@ class ModelNS:
         self.nsprior = nsprior
         self.which = which
         self.gauss_newton_approx = False
+        self.varfM_handler = varfM_handler
         
         self.n_fwd_solve = 0
         self.n_adj_solve = 0
@@ -240,6 +242,9 @@ class ModelNS:
             self.prior.setLinearizationPoint(x[PARAMETER], self.gauss_newton_approx)
             
         self.nsprior.setLinearizationPoint(x[PARAMETER], x[SLACK], self.gauss_newton_approx)
+        
+        if self.varfM_handler is not None:
+            self.nsprior.set_P_mass(self.varfM_handler(x))
 
         
     def solveFwdIncremental(self, sol, rhs):

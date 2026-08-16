@@ -155,7 +155,12 @@ class SNES_VariationalSolver():
 
     def solve(self):
         with self.optmgr.inserted_options():
-            self.snes.solve(None, self.problem.u.vector().vec())
+            x = self.problem.u.vector().vec().copy() # create a copy for PETSc
+            self.snes.solve(None, x)
+
+            x.copy(self.problem.u.vector().vec())  # explicit copy back to dolfin function
+            self.problem.u.vector().apply("")  # update ghost values
+
         return self.getIterationNumber(), self.getConvergedReason()
 
 
